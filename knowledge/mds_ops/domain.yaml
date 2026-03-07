@@ -1,0 +1,19 @@
+# 知识域：行情运维知识
+name: "行情运维"
+description: "行情服务部署、配置、监控、故障排查"
+
+# 本域数据文件目录（所有资料都在这里，自包含）
+data_path: "data"
+
+# 该知识域的 prompt 片段
+prompt: |
+  ## 行情运维
+  - data/conf/ 下是服务配置文件（*.conf, *.xml）
+  - data/script/ 下是部署脚本
+  - data/yaml/ 下是 K8s 部署配置
+  - 常见查询：配置参数含义、部署步骤、监控指标、故障排查
+
+# 示例问题
+examples:
+  - "MarketDataPCServer.conf 里有哪些关键配置？"
+  - "行情服务的 K8s 部署配置是怎样的？"

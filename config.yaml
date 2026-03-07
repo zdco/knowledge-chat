@@ -1,0 +1,32 @@
+# 全能 AI 助手 - 配置文件
+
+# Claude API 配置
+api:
+  # 代理地址
+  base_url: "http://coding.whup.com/"
+  # API 密钥（也可通过环境变量 ANTHROPIC_AUTH_TOKEN 设置，环境变量优先）
+  api_key: ""
+  # 模型名称
+  model: "claude-sonnet-4-5-20250929"
+  # 单次回复最大 token 数
+  max_tokens: 4096
+  # Agent 最大工具调用轮数（防止死循环）
+  max_iterations: 50
+
+# 可用模型（通过 coding.whup.com 代理）：
+#   claude-sonnet-4-5-20250929  - 推荐，性价比高
+#   claude-sonnet-4-6           - 最新 sonnet
+#   claude-haiku-4-5-20251001   - 最快，适合简单问题
+#   claude-opus-4-5-20251101    - 最强，适合复杂分析
+
+# 服务配置
+server:
+  host: "0.0.0.0"
+  port: 5001
+
+# 工具配置
+tools:
+  # 搜索结果最大字符数
+  max_output_length: 15000
+  # 工具结果推送给前端的最大字符数
+  max_display_length: 2000
