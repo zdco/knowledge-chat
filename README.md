@@ -64,15 +64,34 @@ export ANTHROPIC_MODEL="claude-haiku-4-5-20251001"
 
 ## 新增知识域
 
-1. 在 `knowledge/` 下新建 `xxx.yaml`
-2. 填写字段（参考 `knowledge/mds_interface.yaml`）
-3. 重启服务
-4. 完成 — AI 自动具备该领域的查询能力
+### 手动创建
+
+1. 拷贝 `knowledge/_template/` 目录，重命名为知识域英文名（如 `knowledge/my_domain/`）
+2. 将相关资料（源码、文档、配置等）拷贝到 `data/` 下
+3. 编辑 `domain.yaml`，填写名称、描述、prompt 等字段
+4. 重启服务生效
+
+### 用 AI 自动生成
+
+项目提供了 `knowledge/AI_GUIDE.md`，这是一份 AI 工作指令。将它加载到任意 AI 助手（如 Claude、Cursor、Kiro 等）的上下文中，然后告诉 AI 你的源码/文档路径，AI 会自动完成：
+
+1. 扫描分析文件内容和结构
+2. 将所有资料整理拷贝到 `data/` 目录
+3. 生成 `domain.yaml` 配置（包含 prompt 和示例问题）
+
+使用方式：
+
+```
+# 在 AI 助手中加载指南后，直接对话即可
+"帮我用 /path/to/src 和 /path/to/doc 创建一个 xxx 知识域"
+```
+
+AI 会按照指南中的流程自动创建完整的知识域目录，重启服务即可使用。
 
 ## 项目结构
 
 ```
-mdschat/
+knowledge-chat/
 ├── app.py                  # Flask 主应用
 ├── agent_engine.py         # Agent 引擎（知识域加载 + 工具 + API 调用）
 ├── config.yaml             # 全局配置
@@ -80,9 +99,17 @@ mdschat/
 ├── requirements.txt        # Python 依赖
 ├── Dockerfile
 ├── docker-compose.yml
-├── knowledge/              # 知识域配置目录
-│   ├── mds_interface.yaml  # 行情接口查询
-│   └── mds_ops.yaml        # 行情运维知识
+├── knowledge/              # 知识域目录
+│   ├── AI_GUIDE.md         # AI 生成知识域的工作指南
+│   ├── _template/          # 模板（不会被引擎加载）
+│   │   ├── domain.yaml
+│   │   └── data/
+│   ├── mds_interface/      # 示例：行情接口知识域
+│   │   ├── domain.yaml
+│   │   └── data/           # 该域的所有资料（已 gitignore）
+│   └── mds_ops/            # 示例：行情运维知识域
+│       ├── domain.yaml
+│       └── data/
 └── templates/
     └── chat.html           # 聊天页面
 ```
