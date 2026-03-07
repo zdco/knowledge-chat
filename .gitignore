@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
 .env
+
+# 知识域数据文件（体积大，不提交）
+knowledge/*/data/
