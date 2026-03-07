@@ -1,21 +1,43 @@
-# 知识域：行情主站接口
+# knowledge/mds_interface/domain.yaml
 name: "行情主站接口"
-description: "JCE 接口定义、请求参数、数据结构、源码实现"
+description: "行情数据服务（MarketDataServer）的 JCE 接口定义、数据结构、服务端实现、配置文件和使用文档，覆盖股票行情、K线、分时、资金流、Level2 等全部功能"
 
-# 本域数据文件目录（所有资料都在这里，自包含）
 data_path: "data"
 
-# 该知识域的 prompt 片段（会合并到总 system prompt）
 prompt: |
   ## 行情主站接口
-  - data/jce/ 下是 JCE 接口定义文件（*.jce），定义了所有请求和响应结构
-  - data/src/ 下是服务端 C++ 实现（*.cpp, *.h）
-  - data/doc/ 下是接口文档（*.md）
-  - 常见查询：接口参数、枚举值、数据结构、调用示例
+  - data/lib/hqjce/ 下是 JCE 接口定义文件（*.jce），定义了所有请求/响应结构、枚举值和服务接口
+    - Common.jce：通用枚举（E_MARKET_TYPE 市场类型、E_CLI_COMP_TYPE 压缩类型、E_HQ_PACKET_TYPE 包类型）
+    - BasicHq.jce：服务接口定义（stockHq、stockDict、kLineData、rtMinData 等）和推送函数类型
+    - BasicData.jce：数据结构定义（行情、资金流、交易状态、股票信息等）
+    - AuthQ.jce：认证相关接口
+  - data/src/MarketDataServer/ 下是行情主站 C++ 服务端实现（*.cpp, *.h）
+    - BasicHqImp：核心行情接口实现
+    - PushImp/PushReq：推送功能实现
+    - WsImp/WsHqImp：WebSocket 接口实现
+    - ConnectionMng/Session：连接和会话管理
+    - AuthMag/PermissionMag：认证和权限管理
+    - StockCache/GlobalDataCache：数据缓存
+    - BitmapUtil/DataCompare：数据压缩和差量比较
+  - data/src/AuthServer/ 下是认证服务器实现
+  - data/lib/cachedata/ 下是缓存数据层实现（行情更新、K线、分时、板块、排名等）
+  - data/lib/multicachedata/ 下是多市场标准化缓存数据层
+  - data/lib/CloudIO/ 下是云IO数据分发模块
+  - data/doc/ 下是接口文档（interface.md 接口说明、basicData.md 数据结构、WebSocket 和 WUP 使用说明）
+  - data/conf/ 下是服务配置文件
+    - MarketDataPCServer.conf：主站服务配置（连接数、压缩、缓存等）
+    - marketcode.xml：市场代码映射（sz=0 深圳、sh=1 上海、HK=2 香港等）
+    - marketinfo.xml：市场信息和数据源配置
+    - acache.conf/mcache.conf：缓存配置
+    - bitmap.conf：位图配置
+    - cloudio.conf：云IO配置
+    - listmap.xml：板块列表映射
+  - data/example/ 下是客户端示例和测试工具（mdstest、mdstestPush、websockettest、multiconnClient 等）
+  - 常见查询类型：接口调用方式和参数、JCE 枚举值含义、数据结构字段说明、市场代码映射、推送协议、配置项含义、源码实现逻辑
 
-# 示例问题（合并展示在欢迎页）
 examples:
-  - "stockHq 接口怎么调用？请求参数是什么？"
-  - "E_MARKET_CODE 里深圳是多少？"
-  - "哪些接口用到了 HeaderInfo？"
-  - "K线接口和分时接口的请求参数有什么区别？"
+  - "stockHq 接口怎么调用？请求参数和返回结构是什么？"
+  - "E_MARKET_TYPE 里各市场的枚举值分别是多少？"
+  - "资金流（mfByTrade）的超大单、大单、中单、小单是怎么划分的？"
+  - "行情推送（Push）支持哪些数据类型？客户端怎么订阅？"
+  - "MarketDataPCServer.conf 里 openDiff 和 minCompressSize 是什么意思？"
