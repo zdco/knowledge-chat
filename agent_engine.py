@@ -4,6 +4,7 @@ import json
 import subprocess
 import glob as glob_mod
 import time
+import contextvars
 import urllib.request
 import urllib.error
 import threading
@@ -81,6 +82,7 @@ KNOWLEDGE_DOMAINS = load_knowledge_domains()
 
 _domains_lock = threading.Lock()
 logger = logging.getLogger(__name__)
+request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="-")
 
 
 def reload_domains():

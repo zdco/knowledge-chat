@@ -8,7 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - 完善服务日志记录：配置 logging 格式、console + 文件双输出、按天轮转保留 30 天
-- 请求入口日志：记录用户消息摘要和请求来源 IP
+- 请求级 request_id：每条日志携带 8 位请求 ID，可关联同一请求的全链路日志
+- 请求入口日志：记录用户消息摘要和请求来源 IP（支持 X-Forwarded-For / X-Real-IP）
 - AI 调用日志：记录每轮 API 调用、token 用量、异常堆栈
 - 工具执行日志：记录工具名称、参数、耗时、结果长度、异常堆栈
 - config.yaml 新增 logging 配置段（level / file / backup_days）

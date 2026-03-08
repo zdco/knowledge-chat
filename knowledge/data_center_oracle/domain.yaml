@@ -1,0 +1,124 @@
+# knowledge/data_center_oracle/domain.yaml
+
+name: "数据中心Oracle数据库"
+
+description: "数据中心提供的Oracle数据库，包含沪深股票、公募基金、债券、研报、港股、美股、北交所、经济数据、财务数据等金融数据，共844个业务表、11万+字段"
+
+data_path: "data"
+
+databases:
+  - name: 数据中心库
+    type: oracle
+    host: 172.16.8.31
+    port: 1521
+    service_name: upwhdb
+    user: readonly
+    password: anegIjege
+
+prompt: |
+  ## 数据中心 Oracle 数据库
+
+  ### 连接要求（必须遵守）
+  - 数据库版本：Oracle 11g (11.2.0.4.0)
+  - 必须使用 thick 模式连接，连接代码：
+    ```python
+    import oracledb
+    oracledb.init_oracle_client(lib_dir="/home/lvchao/oracle/instantclient_19_24")
+    conn = oracledb.connect(user="readonly", password="anegIjege", dsn="172.16.8.31:1521/upwhdb")
+    ```
+  - 需设置环境变量：export LD_LIBRARY_PATH=/home/lvchao/oracle/instantclient_19_24:/home/linuxbrew/.linuxbrew/lib:$LD_LIBRARY_PATH
+  - SQL 语法限制：Oracle 11g 不支持 FETCH FIRST，必须用子查询 + ROWNUM 限制行数
+    - 正确写法：SELECT * FROM (SELECT ... ORDER BY ...) WHERE ROWNUM <= N
+    - 错误写法：SELECT ... FETCH FIRST N ROWS ONLY
+
+  ### 数据库架构
+  - 业务数据在 UPCENTER schema（844个表），查询时需加 UPCENTER. 前缀
+  - 元数据在 UPRAW schema 的 DIC_ 开头的表（13个表），用于查表名、字段含义等
+  - readonly 用户本身无表，通过授权访问 UPCENTER 和 UPRAW
+
+  ### 元数据表关系（查表找字段的核心链路）
+  - UPRAW.DIC_DB_INFO — 数据库列表（DATABASE_ID 标识库）
+  - UPRAW.DIC_CATGRY_INFO — 分类目录（CATGRY_ID，通过 DATABASE_ID 关联库，PARENT_ID 构成树）
+  - UPRAW.DIC_TABLE_INFO — 表信息（TAB_ID，通过 CATGRY_ID 关联分类）
+    - 关键字段：TAB_CNAME(中文名), TAB_ENAME(英文名/实际表名), MEANING_USE(用途), USE_EXPLAIN(说明)
+  - UPRAW.DIC_FIELD_INFO — 字段信息（FIELD_ID，通过 TAB_ID 关联表）
+    - 关键字段：FIELD_CNAME(中文名), FIELD_ENAME(英文名), FIELD_TYPE, EXPLAIN(说明), MEANING(含义), FIELD_UNIT(单位)
+
+  ### 数据库列表（UPRAW.DIC_DB_INFO）
+  - DATABASE_ID=1010001222, 采集库(upedit)
+  - DATABASE_ID=1010005288, 中心库(dbcenter) — 主要业务库
+  - DATABASE_ID=1010007678, 数据对外服务(UPAD)
+  - DATABASE_ID=1010024264, 抓取库(UPINFO)
+  - DATABASE_ID=1010040194, 应用主库(ALI-YUN)
+  - DATABASE_ID=1010098199, CDH数据库(CDH)
+  - DATABASE_ID=1010145849, 华为云定制库(DZDB)
+  - DATABASE_ID=1010153029, 量化CH库(LH-CHDB)
+  - DATABASE_ID=1010165198, MySQL数据库(MySQL)
+
+  ### UPCENTER 表前缀与业务域对照
+  - STK_(64个表) — 沪深股票：基本资料、行情、股东、分红、融资融券、龙虎榜等
+  - FUND_(93个表) — 公募基金：基本资料、净值、持仓、分红、经理、业绩等
+  - COM_(85个表) — 公司：股东、高管、治理、重大事项、业绩预告等
+  - BOND_(42个表) — 债券：基本信息、发行上市、可转债、评级、利率、行情等
+  - FIN_(38个表) — 财务：资产负债表、利润表、现金流量表（分金融/非金融/港股/美股）
+  - MAC_(45个表) — 宏观经济：财政、货币、贸易、CPI/PPI、PMI等
+  - HK_(40个表) — 港股：基本信息、财务、行情、经纪商等
+  - BSE_(38个表) — 北交所：基本资料、股东、财务、行情等
+  - NEWS_(33个表) — 资讯新闻
+  - RES_(29个表) — 研究报告、盈利预测、券商金股
+  - IND_(15个表) — 指数：基本信息、行情、成分股
+  - PLATE_(15个表) — 板块：板块代码、成分股、统计
+  - PUB_(18个表) — 公用：地区代码、行业分类、证券信息
+  - CONC_(11个表) — 概念/题材：热度指数、成分股
+  - TQ_(45个表) — 天软数据
+  - TBSTK_(47个表) — 三板股票
+  - HKSS_(13个表) — 沪港通/深港通持股
+  - US_(6个表) — 美股
+  - FUT_(8个表) — 期货
+  - CMD_(9个表) — 大宗商品
+  - QUANT_(4个表) — 量化因子
+  - MARGIN_(3个表) — 融资融券统计
+
+  ### 中心库(dbcenter)主要分类
+  - 01-公用库：证券信息、机构、行业、地域、板块、交易日历
+  - 02-沪深股票库：基本资料、股东股本、分红融资、公司治理、财务、融资融券、龙虎榜
+  - 03-公募基金库：基本资料、持有人、份额变动、分红拆分、财务、投资组合、基金经理
+  - 04-债券库：基本信息、发行上市、可转债、信用评级、利率付息、行情
+  - 05-研报库：研究报告、盈利预测、券商金股
+  - 06-资讯库：新闻、业绩说明会
+  - 11-经济数据库：财经日历、国内宏观
+  - 12-题材库：题材信息、成分股
+  - 13-北交所库：基本资料、股东股本、财务、行情
+  - 15-指数库：指数信息、行情、表现
+  - 17-美股库：基本资料、股东
+  - 18-港股库(新)：基本信息、股东、财务、行情
+  - 20-三板数据库(新)：基本资料、财务、交易
+  - 23-策略库：策略选股、个股诊断
+  - 27-大宗商品库：期货、现货
+  - 30-舆情库：大数据指数、个股舆情
+
+  ### 查询指引
+  - 查某个表有哪些字段 → 搜索 data/doc/dic_field_info.txt 中对应表名段落，或查询 UPRAW.DIC_FIELD_INFO WHERE TAB_ID=xxx
+  - 查某个业务概念对应哪些表 → 搜索 data/doc/dic_table_info.txt 中的中文名/用途，或查询 UPRAW.DIC_TABLE_INFO WHERE TAB_CNAME LIKE '%关键词%'
+  - 查某个分类下有哪些表 → 搜索 data/doc/dic_catgry_tree.txt 找到分类ID，再查 DIC_TABLE_INFO
+  - 查 UPCENTER 实际有哪些表 → 搜索 data/doc/upcenter_tables.txt
+  - 查字段含义 → DIC_FIELD_INFO 的 FIELD_CNAME(中文名)、EXPLAIN(说明)、MEANING(含义) 字段
+  - 查表的中英文名对照 → DIC_TABLE_INFO 的 TAB_CNAME 和 TAB_ENAME
+  - 实际查询数据 → SELECT ... FROM UPCENTER.表名 WHERE ...
+
+  ### 常用查询模式
+  1. 通过中文名找表：
+     SELECT TAB_ENAME, TAB_CNAME, MEANING_USE FROM UPRAW.DIC_TABLE_INFO WHERE ISVALID=1 AND TAB_CNAME LIKE '%关键词%'
+  2. 查表的所有字段：
+     SELECT FIELD_ENAME, FIELD_CNAME, FIELD_TYPE, MEANING FROM UPRAW.DIC_FIELD_INFO WHERE ISVALID=1 AND TAB_ID=(SELECT TAB_ID FROM UPRAW.DIC_TABLE_INFO WHERE TAB_ENAME='表英文名' AND ISVALID=1)
+  3. 查表数据量：
+     SELECT COUNT(*) FROM UPCENTER.表名
+  4. 抽样查看数据：
+     SELECT * FROM (SELECT * FROM UPCENTER.表名) WHERE ROWNUM <= 10
+
+examples:
+  - "帮我查一下沪深股票基本资料表(STK_BASIC_INFO)有哪些字段？"
+  - "数据库里有哪些和基金净值相关的表？"
+  - "查一下 UPCENTER.BOND_BASIC_INFO 表最近10条数据"
+  - "帮我统计一下公募基金库下各个表的数据量"
+  - "COM_开头的表有哪些？分别是什么含义？"

@@ -2,20 +2,28 @@
 import json
 import logging
 import os
+import uuid
 from logging.handlers import TimedRotatingFileHandler
 
 from flask import Flask, render_template, request, Response
 
-from agent_engine import run_agent_stream, CONFIG, KNOWLEDGE_DOMAINS, start_watcher
+from agent_engine import run_agent_stream, CONFIG, KNOWLEDGE_DOMAINS, start_watcher, request_id_var
 
 # ── 日志初始化 ────────────────────────────────────────────
 _log_cfg = CONFIG.get("logging", {})
 _log_level = getattr(logging, _log_cfg.get("level", "INFO").upper(), logging.INFO)
 _log_file = _log_cfg.get("file", "logs/app.log")
 _log_backup_days = _log_cfg.get("backup_days", 30)
-_log_format = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
+_log_format = "%(asctime)s %(levelname)s [%(name)s] [%(request_id)s] %(message)s"
 
 os.makedirs(os.path.dirname(_log_file), exist_ok=True)
+
+
+class _RequestIdFilter(logging.Filter):
+    def filter(self, record):
+        record.request_id = request_id_var.get("-")
+        return True
+
 
 _formatter = logging.Formatter(_log_format)
 
@@ -28,6 +36,7 @@ _file_handler = TimedRotatingFileHandler(
 _file_handler.setFormatter(_formatter)
 
 logging.basicConfig(level=_log_level, handlers=[_console_handler, _file_handler])
+logging.getLogger().addFilter(_RequestIdFilter())
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +69,10 @@ def chat_api():
     if not user_message:
         return {"error": "消息不能为空"}, 400
 
-    logger.info("收到请求: %s [来源: %s]", user_message[:200], request.remote_addr)
+    req_id = uuid.uuid4().hex[:8]
+    request_id_var.set(req_id)
+    client_ip = request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP", request.remote_addr))
+    logger.info("收到请求: %s [来源: %s]", user_message[:200], client_ip)
 
     messages = list(history)
     messages.append({"role": "user", "content": user_message})
