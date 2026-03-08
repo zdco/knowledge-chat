@@ -453,7 +453,9 @@ def exec_tool(name: str, inp: dict) -> str:
             path = _safe_path(inp.get("path", ""))
             ctx = str(inp.get("context_lines", 3))
             result = subprocess.run(
-                ["grep", "-E", "-r", "-n", f"-C{ctx}", "--exclude-dir=logs", "--exclude-dir=shares",
+                ["grep", "-E", "-r", "-n", f"-C{ctx}",
+                 "--exclude-dir=logs", "--exclude-dir=shares",
+                 "--exclude-dir=.venv", "--exclude-dir=__pycache__", "--exclude-dir=.git",
                  "--include=*.jce",
                  "--include=*.h", "--include=*.cpp", "--include=*.md",
                  "--include=*.conf", "--include=*.xml", "--include=*.yaml",
@@ -486,7 +488,9 @@ def exec_tool(name: str, inp: dict) -> str:
             knowledge_dir = os.path.join(PROJECT_ROOT, "knowledge")
             if output == "无匹配结果" and path != PROJECT_ROOT and path != knowledge_dir:
                 fallback = subprocess.run(
-                    ["grep", "-E", "-r", "-n", "-C1", "--exclude-dir=logs", "--exclude-dir=shares",
+                    ["grep", "-E", "-r", "-n", "-C1",
+                     "--exclude-dir=logs", "--exclude-dir=shares",
+                     "--exclude-dir=.venv", "--exclude-dir=__pycache__", "--exclude-dir=.git",
                      "--include=*.md", "--include=*.txt", "--include=*.yaml",
                      keyword, knowledge_dir],
                     capture_output=True, text=True, timeout=30,
