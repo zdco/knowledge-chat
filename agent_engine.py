@@ -482,6 +482,18 @@ def exec_tool(name: str, inp: dict) -> str:
                 else:
                     output += "\n" + "\n".join(office_matches)
 
+            # 子目录搜索无结果时，自动扩大到整个 knowledge/ 目录重搜
+            knowledge_dir = os.path.join(PROJECT_ROOT, "knowledge")
+            if output == "无匹配结果" and path != PROJECT_ROOT and path != knowledge_dir:
+                fallback = subprocess.run(
+                    ["grep", "-r", "-n", "-C1", "--exclude-dir=logs", "--exclude-dir=shares",
+                     "--include=*.md", "--include=*.txt", "--include=*.yaml",
+                     keyword, knowledge_dir],
+                    capture_output=True, text=True, timeout=30,
+                )
+                if fallback.stdout:
+                    output = f"在 {os.path.relpath(path, PROJECT_ROOT)} 中未找到，已自动扩大搜索范围：\n{fallback.stdout}"
+
         elif name == "read_file":
             fpath = _safe_path(inp["path"])
             ext = os.path.splitext(fpath)[1].lower()
