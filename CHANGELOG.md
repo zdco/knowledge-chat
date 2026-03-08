@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - 修复日志 `request_id` 字段缺失导致启动报错：将 filter 从 root logger 移到 handler 上，确保子 logger 的日志也能注入 request_id
 - 修复 Confluence 导航树解析不完整：兼容每个子页面独立 `<ul>` 的 HTML 结构，从 3 个页面恢复到完整 84 个页面
+- Confluence 转换跳过空内容页面，不再生成空 Markdown 文件
 
 ## [0.2.0] - 2026-03-08
 

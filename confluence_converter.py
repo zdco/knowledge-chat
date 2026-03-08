@@ -118,12 +118,15 @@ def _write_nav_tree(
             # 有子节点 → 创建目录
             node_dir = os.path.join(parent_dir, safe_title)
             os.makedirs(node_dir, exist_ok=True)
-            md_path = os.path.join(node_dir, f"{safe_title}.md")
-            with open(md_path, "w", encoding="utf-8") as f:
-                f.write(markdown)
+            if markdown.strip():
+                md_path = os.path.join(node_dir, f"{safe_title}.md")
+                with open(md_path, "w", encoding="utf-8") as f:
+                    f.write(markdown)
             _write_nav_tree(node.children, node_dir, src_root, domain_name)
         else:
             # 叶子节点 → 直接写文件
+            if not markdown.strip():
+                continue
             md_path = os.path.join(parent_dir, f"{safe_title}.md")
             with open(md_path, "w", encoding="utf-8") as f:
                 f.write(markdown)
