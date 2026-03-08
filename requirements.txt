@@ -2,3 +2,4 @@ flask
 anthropic
 httpx[socks]
 pyyaml
+watchdog

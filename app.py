@@ -2,9 +2,10 @@
 import json
 from flask import Flask, render_template, request, Response
 
-from agent_engine import run_agent_stream, CONFIG, KNOWLEDGE_DOMAINS
+from agent_engine import run_agent_stream, CONFIG, KNOWLEDGE_DOMAINS, start_watcher
 
 app = Flask(__name__)
+start_watcher()
 
 
 def _get_examples() -> list[dict]:

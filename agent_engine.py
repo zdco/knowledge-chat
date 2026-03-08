@@ -5,9 +5,13 @@ import subprocess
 import glob as glob_mod
 import urllib.request
 import urllib.error
+import threading
+import logging
 
 import yaml
 import anthropic
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 # ── 加载配置 ──────────────────────────────────────────────
 
@@ -70,6 +74,66 @@ def load_knowledge_domains() -> list[dict]:
 
 
 KNOWLEDGE_DOMAINS = load_knowledge_domains()
+
+_domains_lock = threading.Lock()
+logger = logging.getLogger(__name__)
+
+
+def reload_domains():
+    """重新加载所有知识域并重建 system prompt"""
+    global KNOWLEDGE_DOMAINS, SYSTEM_PROMPT
+    new_domains = load_knowledge_domains()
+    with _domains_lock:
+        KNOWLEDGE_DOMAINS.clear()
+        KNOWLEDGE_DOMAINS.extend(new_domains)
+        SYSTEM_PROMPT = build_system_prompt()
+    logger.info("知识域已热加载，当前 %d 个域", len(KNOWLEDGE_DOMAINS))
+
+
+class _DomainFileHandler(FileSystemEventHandler):
+    """监听 knowledge/*/domain.yaml 变化，防抖 1 秒后触发 reload"""
+
+    def __init__(self):
+        self._timer: threading.Timer | None = None
+
+    def _schedule_reload(self):
+        if self._timer is not None:
+            self._timer.cancel()
+        self._timer = threading.Timer(1.0, reload_domains)
+        self._timer.daemon = True
+        self._timer.start()
+
+    def _is_domain_yaml(self, path: str) -> bool:
+        return os.path.basename(path) == "domain.yaml"
+
+    def on_created(self, event):
+        if not event.is_directory and self._is_domain_yaml(event.src_path):
+            self._schedule_reload()
+
+    def on_modified(self, event):
+        if not event.is_directory and self._is_domain_yaml(event.src_path):
+            self._schedule_reload()
+
+    def on_deleted(self, event):
+        if not event.is_directory and self._is_domain_yaml(event.src_path):
+            self._schedule_reload()
+
+
+_observer: Observer | None = None
+
+
+def start_watcher():
+    """启动 watchdog 监听 knowledge/ 目录变化"""
+    global _observer
+    if _observer is not None:
+        return
+    if not os.path.isdir(_KNOWLEDGE_DIR):
+        return
+    _observer = Observer()
+    _observer.schedule(_DomainFileHandler(), _KNOWLEDGE_DIR, recursive=True)
+    _observer.daemon = True
+    _observer.start()
+    logger.info("知识域文件监听已启动: %s", _KNOWLEDGE_DIR)
 
 
 def build_system_prompt() -> str:
