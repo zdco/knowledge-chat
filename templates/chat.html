@@ -9,7 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#f7f7f8;--chat-bg:#fff;--user-bg:#e3f2fd;--ai-bg:#f5f5f5;--border:#e0e0e0;--primary:#1976d2;--text:#333;--text-secondary:#666;--tool-bg:#1e1e1e;--tool-border:#333;--tool-text:#d4d4d4;--tool-header:#569cd6;--tool-dim:#808080;--radius:12px}
+:root{--bg:#f7f7f8;--chat-bg:#fff;--user-bg:#e3f2fd;--ai-bg:#f5f5f5;--border:#e0e0e0;--primary:#1976d2;--text:#333;--text-secondary:#666;--tool-bg:#f0f1f3;--tool-border:#d8dbe0;--tool-text:#444;--tool-header:#2b6cb0;--tool-dim:#888;--radius:12px}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column}
 .header{background:var(--primary);color:#fff;padding:16px 24px;font-size:18px;font-weight:600;flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
 .header .left{display:flex;align-items:center;gap:10px}
@@ -36,17 +36,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .tool-block summary .tool-name{color:var(--tool-header)}
 .tool-block summary .tool-preview{color:var(--tool-dim);font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
 .tool-block summary .tool-status{font-size:11px;font-weight:400}
-.tool-block summary .tool-status.running{color:#4ec9b0}
+.tool-block summary .tool-status.running{color:#2b6cb0}
 .tool-block summary .tool-status.done{color:var(--tool-dim)}
-.tool-block .tool-detail{padding:0 14px 10px;border-top:1px solid #333}
-.tool-block .tool-detail .label{color:#c586c0;margin:8px 0 4px;font-size:12px}
+.tool-block .tool-detail{padding:0 14px 10px;border-top:1px solid var(--tool-border)}
+.tool-block .tool-detail .label{color:#7c3aed;margin:8px 0 4px;font-size:12px}
 .tool-block .tool-detail pre{margin:0;white-space:pre-wrap;font-size:12px;max-height:300px;overflow-y:auto}
 .tool-block .tool-detail pre::-webkit-scrollbar{width:6px}
-.tool-block .tool-detail pre::-webkit-scrollbar-thumb{background:#555;border-radius:3px}
-.tool-block .tool-detail .tool-input-pre{color:#ce9178}
+.tool-block .tool-detail pre::-webkit-scrollbar-thumb{background:#bbb;border-radius:3px}
+.tool-block .tool-detail .tool-input-pre{color:#9a5b2f}
 .tool-block .tool-detail .tool-output-pre{color:var(--tool-text)}
 /* 加载动画 */
-.tool-spinner{display:inline-block;width:12px;height:12px;border:2px solid #4ec9b0;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle}
+.tool-spinner{display:inline-block;width:12px;height:12px;border:2px solid #2b6cb0;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 .input-area{flex-shrink:0;padding:16px 24px;background:#fff;border-top:1px solid var(--border);display:flex;gap:12px}
@@ -218,7 +218,10 @@ startNewSession();
 // ── 消息渲染 ──────────────────────────────────
 function fillInput(text){userInput.value=text;userInput.focus()}
 function handleKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage()}}
-function scrollBottom(){chatBox.scrollTop=chatBox.scrollHeight}
+function isNearBottom(){return chatBox.scrollHeight-chatBox.scrollTop-chatBox.clientHeight<80}
+let userScrolled=false;
+chatBox.addEventListener('scroll',()=>{userScrolled=!isNearBottom()});
+function scrollBottom(){if(!userScrolled)chatBox.scrollTop=chatBox.scrollHeight}
 
 function addMsg(role,html){
   const d=document.createElement('div');
@@ -272,6 +275,7 @@ async function sendMessage(){
   if(!text||sending)return;
   sending=true;
   sendBtn.disabled=true;
+  userScrolled=false;
 
   const welcome=document.getElementById('welcome');
   if(welcome)welcome.style.display='none';
@@ -320,8 +324,8 @@ async function sendMessage(){
             currentToolBlock=null;
           }else if(eventType==='text_delta'){
             const delta=data.delta||'';
-            // 过滤工具调用间的无意义占位文本
-            if(!aiDiv&&delta.trim().length<=1)continue;
+            // 过滤工具调用间的无意义占位文本（纯标点/空白）
+            if(!aiDiv&&/^[\s.,;:!?。，；：！？…·\-]+$/.test(delta))continue;
             // 工具调用结束后的文本，创建新的 AI 消息块
             if(!aiDiv){
               aiDiv=addMsg('ai','');
