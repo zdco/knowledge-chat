@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 工具执行增加必填参数校验，模型传空参数时返回友好提示而非抛出 KeyError
 - 空参数的工具调用不再显示在前端界面，避免刷屏；同时标记 `is_error` 帮助模型理解失败
 - 连续 3 轮工具调用参数全部为空时自动终止循环，防止模型陷入死循环浪费轮次
+- system prompt 自动检测 wiki 目录并显式提示搜索，引导能力较弱的模型也能搜到 Confluence 文档
 
 ## [0.2.0] - 2026-03-08
 

@@ -223,6 +223,11 @@ def build_system_prompt() -> str:
         abs_data_path = domain.get("_abs_data_path")
         if abs_data_path:
             parts.append(f"  数据文件目录：{abs_data_path}")
+            # 如果有 wiki 目录，显式提示搜索
+            wiki_dir = os.path.join(abs_data_path, "wiki")
+            if os.path.isdir(wiki_dir):
+                wiki_rel = os.path.relpath(wiki_dir, PROJECT_ROOT)
+                parts.append(f"  Confluence 文档目录：{wiki_rel}（包含技术文档、算法说明等，遇到相关问题务必搜索此目录）")
 
     # 注入数据库连接信息
     db_sections = []
