@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 发送消息后显示"思考中..."加载指示器，AI 开始回复或调用工具后自动消失
 - 分享 API（POST /api/share）：基于内容 SHA-256 生成幂等分享 ID
 - search 工具追加 `--exclude-dir=shares` 防止搜索污染分享数据
+- 支持 OpenAI API 格式：新增 `api_format` 配置项，可选 `anthropic` 或 `openai`，不设置时根据 `base_url` 是否含 `/v1` 自动判断。非 Claude 模型建议用 openai 格式
 
 ### Changed
 - 缩小对话区域中回复文本与工具块之间的间距（gap 16px → 8px）

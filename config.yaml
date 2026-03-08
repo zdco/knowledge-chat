@@ -1,17 +1,20 @@
 # 全能 AI 助手 - 配置文件
 
-# Claude API 配置
+# API 配置
 api:
-  # 代理地址
+  # 代理地址（含 /v1 自动走 OpenAI 格式，否则走 Anthropic 格式）
   base_url: "http://coding.whup.com/"
   # API 密钥（也可通过环境变量 ANTHROPIC_AUTH_TOKEN 设置，环境变量优先）
   api_key: ""
   # 模型名称
-  model: "MiniMax-M2.5"
+  model: "claude-haiku-4-5-20251001"
   # 单次回复最大 token 数
   max_tokens: 4096
   # Agent 最大工具调用轮数（防止死循环）
   max_iterations: 50
+  # API 格式："anthropic" 或 "openai"，不设置则根据 base_url 是否含 /v1 自动判断
+  # 非 Claude 模型（GLM、MiniMax 等）建议用 openai 格式以获得更好的工具调用兼容性
+  # api_format: "openai"
 
 # 可用模型（通过 coding.whup.com 代理）：
 #   claude-sonnet-4-5-20250929  - 推荐，性价比高

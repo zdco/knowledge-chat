@@ -1,4 +1,4 @@
-"""全能 Agent 引擎：知识域动态加载 + 工具定义 + 执行 + Claude API 流式调用"""
+"""全能 Agent 引擎：知识域动态加载 + 工具定义 + 执行 + 多 SDK 流式调用"""
 import os
 import json
 import subprocess
@@ -11,7 +11,6 @@ import threading
 import logging
 
 import yaml
-import anthropic
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -38,6 +37,13 @@ MAX_TOKENS = CONFIG["api"]["max_tokens"]
 MAX_ITERATIONS = CONFIG["api"]["max_iterations"]
 MAX_OUTPUT_LEN = CONFIG["tools"]["max_output_length"]
 MAX_DISPLAY_LEN = CONFIG["tools"]["max_display_length"]
+
+# API 格式：显式配置 > 根据 base_url 自动判断（含 /v1 用 openai，否则 anthropic）
+_api_format_cfg = CONFIG["api"].get("api_format", "").lower()
+if _api_format_cfg in ("openai", "anthropic"):
+    API_FORMAT = _api_format_cfg
+else:
+    API_FORMAT = "openai" if "/v1" in BASE_URL else "anthropic"
 
 PROJECT_ROOT = os.path.abspath(_DIR)
 
@@ -550,12 +556,26 @@ def exec_tool(name: str, inp: dict) -> str:
 
 # ── Agent 流式调用 ────────────────────────────────────────
 
-def run_agent_stream(messages: list):
-    """Agent 循环：流式调用 Claude，自动执行工具，yield SSE 事件"""
+
+def _tools_to_openai() -> list[dict]:
+    """将 Anthropic 格式的工具定义转换为 OpenAI 格式"""
+    return [{
+        "type": "function",
+        "function": {
+            "name": tool["name"],
+            "description": tool["description"],
+            "parameters": tool["input_schema"],
+        },
+    } for tool in TOOLS]
+
+
+def _run_anthropic_stream(messages: list):
+    """Anthropic SDK 流式调用"""
+    import anthropic
     client = anthropic.Anthropic(base_url=BASE_URL, api_key=API_KEY)
 
     for iteration in range(MAX_ITERATIONS):
-        logger.info("调用 Claude API, 第 %d 轮", iteration + 1)
+        logger.info("调用 API (anthropic), 第 %d 轮", iteration + 1)
         try:
             with client.messages.stream(
                 model=MODEL,
@@ -564,17 +584,14 @@ def run_agent_stream(messages: list):
                 messages=messages,
                 tools=TOOLS,
             ) as stream:
-                # 流式输出文本
                 for event in stream:
                     if event.type == "content_block_delta":
                         delta = event.delta
                         if hasattr(delta, "text"):
                             yield {"event": "text_delta", "data": {"delta": delta.text}}
-
                 final_message = stream.get_final_message()
 
             logger.info("API 返回, usage: %s", final_message.usage)
-
         except Exception as e:
             logger.error("API 调用失败: %s", e, exc_info=True)
             yield {"event": "error", "data": {"message": str(e)}}
@@ -582,7 +599,6 @@ def run_agent_stream(messages: list):
             return
 
         messages.append({"role": "assistant", "content": final_message.content})
-
         tool_blocks = [b for b in final_message.content if b.type == "tool_use"]
 
         if not tool_blocks:
@@ -591,28 +607,20 @@ def run_agent_stream(messages: list):
 
         tool_results = []
         for tb in tool_blocks:
-            # 空参数调用：静默处理，不推送前端，标记 is_error 帮助模型理解
             param_err = _check_tool_params(tb.name, tb.input)
             if param_err:
                 logger.warning("工具参数为空，跳过: %s", tb.name)
                 tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": tb.id,
-                    "content": param_err,
-                    "is_error": True,
+                    "type": "tool_result", "tool_use_id": tb.id,
+                    "content": param_err, "is_error": True,
                 })
                 continue
 
             yield {"event": "tool_start", "data": {"tool": tb.name, "input": tb.input}}
-
             result = exec_tool(tb.name, tb.input)
-
             yield {"event": "tool_result", "data": {"tool": tb.name, "output": result[:MAX_DISPLAY_LEN]}}
-
             tool_results.append({
-                "type": "tool_result",
-                "tool_use_id": tb.id,
-                "content": result,
+                "type": "tool_result", "tool_use_id": tb.id, "content": result,
             })
 
         messages.append({"role": "user", "content": tool_results})
@@ -620,3 +628,105 @@ def run_agent_stream(messages: list):
     logger.warning("达到最大迭代次数 %d", MAX_ITERATIONS)
     yield {"event": "error", "data": {"message": "达到最大迭代次数"}}
     yield {"event": "done", "data": {}}
+
+
+def _run_openai_stream(messages: list):
+    """OpenAI SDK 流式调用"""
+    from openai import OpenAI
+    client = OpenAI(base_url=BASE_URL, api_key=API_KEY)
+    oai_tools = _tools_to_openai()
+
+    # 构建 OpenAI 格式消息列表
+    oai_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    for msg in messages:
+        oai_messages.append({"role": msg["role"], "content": msg["content"]})
+
+    for iteration in range(MAX_ITERATIONS):
+        logger.info("调用 API (openai), 第 %d 轮", iteration + 1)
+        try:
+            stream = client.chat.completions.create(
+                model=MODEL,
+                max_tokens=MAX_TOKENS,
+                messages=oai_messages,
+                tools=oai_tools,
+                stream=True,
+            )
+
+            content = ""
+            tool_calls_acc = {}  # index -> {id, name, arguments}
+
+            for chunk in stream:
+                choice = chunk.choices[0] if chunk.choices else None
+                if not choice:
+                    continue
+                delta = choice.delta
+
+                if delta.content:
+                    yield {"event": "text_delta", "data": {"delta": delta.content}}
+                    content += delta.content
+
+                if delta.tool_calls:
+                    for tc in delta.tool_calls:
+                        idx = tc.index
+                        if idx not in tool_calls_acc:
+                            tool_calls_acc[idx] = {"id": "", "name": "", "arguments": ""}
+                        if tc.id:
+                            tool_calls_acc[idx]["id"] = tc.id
+                        if tc.function and tc.function.name:
+                            tool_calls_acc[idx]["name"] = tc.function.name
+                        if tc.function and tc.function.arguments:
+                            tool_calls_acc[idx]["arguments"] += tc.function.arguments
+
+            logger.info("API 返回, 第 %d 轮, 工具调用数: %d", iteration + 1, len(tool_calls_acc))
+
+        except Exception as e:
+            logger.error("API 调用失败: %s", e, exc_info=True)
+            yield {"event": "error", "data": {"message": str(e)}}
+            yield {"event": "done", "data": {}}
+            return
+
+        # 无工具调用，结束
+        if not tool_calls_acc:
+            yield {"event": "done", "data": {}}
+            return
+
+        # 构建 assistant 消息（含 tool_calls）
+        assistant_msg = {"role": "assistant", "content": content or None, "tool_calls": [
+            {"id": tc["id"], "type": "function", "function": {"name": tc["name"], "arguments": tc["arguments"]}}
+            for tc in sorted(tool_calls_acc.values(), key=lambda x: x["id"])
+        ]}
+        oai_messages.append(assistant_msg)
+
+        # 执行工具
+        for tc in sorted(tool_calls_acc.values(), key=lambda x: x["id"]):
+            try:
+                inp = json.loads(tc["arguments"]) if tc["arguments"] else {}
+            except json.JSONDecodeError:
+                inp = {}
+
+            param_err = _check_tool_params(tc["name"], inp)
+            if param_err:
+                logger.warning("工具参数为空，跳过: %s", tc["name"])
+                oai_messages.append({
+                    "role": "tool", "tool_call_id": tc["id"], "content": param_err,
+                })
+                continue
+
+            yield {"event": "tool_start", "data": {"tool": tc["name"], "input": inp}}
+            result = exec_tool(tc["name"], inp)
+            yield {"event": "tool_result", "data": {"tool": tc["name"], "output": result[:MAX_DISPLAY_LEN]}}
+            oai_messages.append({
+                "role": "tool", "tool_call_id": tc["id"], "content": result,
+            })
+
+    logger.warning("达到最大迭代次数 %d", MAX_ITERATIONS)
+    yield {"event": "error", "data": {"message": "达到最大迭代次数"}}
+    yield {"event": "done", "data": {}}
+
+
+def run_agent_stream(messages: list):
+    """Agent 循环：根据 API_FORMAT 选择对应 SDK 进行流式调用"""
+    if API_FORMAT == "openai":
+        yield from _run_openai_stream(messages)
+    else:
+        yield from _run_anthropic_stream(messages)
