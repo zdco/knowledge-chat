@@ -38,12 +38,13 @@ MAX_ITERATIONS = CONFIG["api"]["max_iterations"]
 MAX_OUTPUT_LEN = CONFIG["tools"]["max_output_length"]
 MAX_DISPLAY_LEN = CONFIG["tools"]["max_display_length"]
 
-# API 格式：显式配置 > 根据 base_url 自动判断（含 /v1 用 openai，否则 anthropic）
+# API 格式：显式配置 > 根据 config 中 base_url 自动判断（含 /v1 用 openai，否则 anthropic）
 _api_format_cfg = CONFIG["api"].get("api_format", "").lower()
 if _api_format_cfg in ("openai", "anthropic"):
     API_FORMAT = _api_format_cfg
 else:
-    API_FORMAT = "openai" if "/v1" in BASE_URL else "anthropic"
+    _cfg_url = CONFIG["api"]["base_url"]
+    API_FORMAT = "openai" if "/v1" in _cfg_url else "anthropic"
 
 PROJECT_ROOT = os.path.abspath(_DIR)
 
@@ -557,6 +558,9 @@ def exec_tool(name: str, inp: dict) -> str:
 # ── Agent 流式调用 ────────────────────────────────────────
 
 
+_MAX_EMPTY_RETRIES = 3  # 连续空参数工具调用的最大容忍次数
+
+
 def _tools_to_openai() -> list[dict]:
     """将 Anthropic 格式的工具定义转换为 OpenAI 格式"""
     return [{
@@ -573,6 +577,7 @@ def _run_anthropic_stream(messages: list):
     """Anthropic SDK 流式调用"""
     import anthropic
     client = anthropic.Anthropic(base_url=BASE_URL, api_key=API_KEY)
+    empty_retries = 0
 
     for iteration in range(MAX_ITERATIONS):
         logger.info("调用 API (anthropic), 第 %d 轮", iteration + 1)
@@ -605,6 +610,17 @@ def _run_anthropic_stream(messages: list):
             yield {"event": "done", "data": {}}
             return
 
+        # 检查是否所有工具调用都是空参数
+        all_empty = all(_check_tool_params(tb.name, tb.input) for tb in tool_blocks)
+        if all_empty:
+            empty_retries += 1
+            if empty_retries >= _MAX_EMPTY_RETRIES:
+                logger.warning("连续 %d 轮工具调用参数为空，终止循环", empty_retries)
+                yield {"event": "done", "data": {}}
+                return
+        else:
+            empty_retries = 0
+
         tool_results = []
         for tb in tool_blocks:
             param_err = _check_tool_params(tb.name, tb.input)
@@ -635,6 +651,7 @@ def _run_openai_stream(messages: list):
     from openai import OpenAI
     client = OpenAI(base_url=BASE_URL, api_key=API_KEY)
     oai_tools = _tools_to_openai()
+    empty_retries = 0
 
     # 构建 OpenAI 格式消息列表
     oai_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -690,20 +707,34 @@ def _run_openai_stream(messages: list):
             yield {"event": "done", "data": {}}
             return
 
-        # 构建 assistant 消息（含 tool_calls）
-        assistant_msg = {"role": "assistant", "content": content or None, "tool_calls": [
-            {"id": tc["id"], "type": "function", "function": {"name": tc["name"], "arguments": tc["arguments"]}}
-            for tc in sorted(tool_calls_acc.values(), key=lambda x: x["id"])
-        ]}
-        oai_messages.append(assistant_msg)
-
-        # 执行工具
+        # 解析参数并检查是否全部为空
+        parsed_calls = []
         for tc in sorted(tool_calls_acc.values(), key=lambda x: x["id"]):
             try:
                 inp = json.loads(tc["arguments"]) if tc["arguments"] else {}
             except json.JSONDecodeError:
                 inp = {}
+            parsed_calls.append((tc, inp))
 
+        all_empty = all(_check_tool_params(tc["name"], inp) for tc, inp in parsed_calls)
+        if all_empty:
+            empty_retries += 1
+            if empty_retries >= _MAX_EMPTY_RETRIES:
+                logger.warning("连续 %d 轮工具调用参数为空，终止循环", empty_retries)
+                yield {"event": "done", "data": {}}
+                return
+        else:
+            empty_retries = 0
+
+        # 构建 assistant 消息（含 tool_calls）
+        assistant_msg = {"role": "assistant", "content": content or None, "tool_calls": [
+            {"id": tc["id"], "type": "function", "function": {"name": tc["name"], "arguments": tc["arguments"]}}
+            for tc, _ in parsed_calls
+        ]}
+        oai_messages.append(assistant_msg)
+
+        # 执行工具
+        for tc, inp in parsed_calls:
             param_err = _check_tool_params(tc["name"], inp)
             if param_err:
                 logger.warning("工具参数为空，跳过: %s", tc["name"])
