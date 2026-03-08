@@ -90,9 +90,10 @@ examples:
 
 1. 创建 `knowledge/<domain_name>/` 目录
 2. 创建 `data/` 及其子目录
-3. 拷贝所有文件到 `data/` 对应子目录下
-4. 写入 `data/README.md`，说明各子目录的来源和内容
-5. 写入 `domain.yaml`
+3. 创建 `memory/` 目录（用于 AI 学习笔记，无需放任何文件）
+4. 拷贝所有文件到 `data/` 对应子目录下
+5. 写入 `data/README.md`，说明各子目录的来源和内容
+6. 写入 `domain.yaml`
 
 ### 第五步：输出总结
 
@@ -113,11 +114,12 @@ knowledge/
 │       └── README.md
 ├── <domain_name>/           # 知识域目录（自包含，可整体拷贝部署）
 │   ├── domain.yaml          # 知识域配置（必须叫这个名字）
-│   └── data/                # 该域的所有资料（源码、文档、配置等）
-│       ├── README.md
-│       ├── src/
-│       ├── jce/
-│       └── ...
+│   ├── data/                # 该域的所有资料（源码、文档、配置等）
+│   │   ├── README.md
+│   │   ├── src/
+│   │   ├── jce/
+│   │   └── ...
+│   └── memory/              # AI 学习笔记（自动创建，通过 search 检索）
 ```
 
 引擎扫描规则：`knowledge/*/domain.yaml`，跳过 `_` 和 `.` 开头的目录。
