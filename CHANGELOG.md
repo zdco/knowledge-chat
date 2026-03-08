@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 修复 Confluence 导航树解析不完整：兼容每个子页面独立 `<ul>` 的 HTML 结构，从 3 个页面恢复到完整 84 个页面
 - Confluence 转换跳过空内容页面，不再生成空 Markdown 文件
 - Confluence 转换时将页面标题作为 H1 写入 Markdown 开头，使按标题关键词搜索能命中文件
+- 修复 `PROJECT_ROOT` 路径计算错误（指向 `/mnt` 而非项目目录），导致搜索工具找不到文件或扫描超时
 
 ## [0.2.0] - 2026-03-08
 

@@ -39,7 +39,7 @@ MAX_ITERATIONS = CONFIG["api"]["max_iterations"]
 MAX_OUTPUT_LEN = CONFIG["tools"]["max_output_length"]
 MAX_DISPLAY_LEN = CONFIG["tools"]["max_display_length"]
 
-PROJECT_ROOT = os.path.abspath(os.path.join(_DIR, "..", "..", ".."))
+PROJECT_ROOT = os.path.abspath(_DIR)
 
 # ── 知识域加载 ────────────────────────────────────────────
 
