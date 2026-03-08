@@ -23,7 +23,18 @@
 
 当用户说"发版 x.x.x"时，执行以下操作：
 
-1. 将 `CHANGELOG.md` 中 `[Unreleased]` 下的内容移到新版本号下，格式：`## [x.x.x] - YYYY-MM-DD`
-2. 保留一个空的 `[Unreleased]` 段落在最上方
-3. 提交：`chore: release vx.x.x`
-4. 打 git tag：`vx.x.x`
+1. 检查 `CHANGELOG.md` 的 `[Unreleased]` 下是否有内容，如果为空则提示用户并中止
+2. 将 `[Unreleased]` 下的内容移到新版本号下，格式：`## [x.x.x] - YYYY-MM-DD`
+3. 保留一个空的 `[Unreleased]` 段落在最上方
+4. 提交：`chore: release vx.x.x`
+5. 打 git tag：`vx.x.x`
+
+版本号遵循 [Semantic Versioning](https://semver.org/)：
+- 主版本号（x.0.0）：不兼容的重大变更
+- 次版本号（0.x.0）：新增功能，向下兼容
+- 修订号（0.0.x）：bug 修复，向下兼容
+
+## 代码变更原则
+
+- 修改任何文件前，必须先读取该文件内容，理解现有逻辑后再动手
+- `knowledge/*/data/` 下是用户的知识域数据，禁止修改或删除，除非用户明确要求
