@@ -406,23 +406,34 @@ def _read_office_file(fpath: str) -> str:
     return ""
 
 
+# 工具必填参数映射
+_REQUIRED_FIELDS = {
+    "search": ["keyword"],
+    "read_file": ["path"],
+    "write_file": ["path", "content"],
+    "glob": ["pattern"],
+    "bash": ["command"],
+    "web_fetch": ["url"],
+    "run_python": ["code"],
+}
+
+
+def _check_tool_params(name: str, inp: dict) -> str | None:
+    """校验工具必填参数，返回错误消息或 None"""
+    missing = [f for f in _REQUIRED_FIELDS.get(name, []) if f not in inp or not inp[f]]
+    if missing:
+        return f"参数错误：缺少必填参数 {', '.join(missing)}，请重新调用并提供完整参数"
+    return None
+
+
 def exec_tool(name: str, inp: dict) -> str:
     """执行工具，返回结果字符串"""
     logger.info("执行工具: %s, 参数: %s", name, json.dumps(inp, ensure_ascii=False)[:500])
 
-    # 校验必填参数，防止模型返回空参数导致 KeyError
-    required_fields = {
-        "search": ["keyword"],
-        "read_file": ["path"],
-        "write_file": ["path", "content"],
-        "glob": ["pattern"],
-        "bash": ["command"],
-        "web_fetch": ["url"],
-        "run_python": ["code"],
-    }
-    missing = [f for f in required_fields.get(name, []) if f not in inp or not inp[f]]
-    if missing:
-        return f"参数错误：缺少必填参数 {', '.join(missing)}，请重新调用并提供完整参数"
+    # 校验必填参数
+    param_err = _check_tool_params(name, inp)
+    if param_err:
+        return param_err
 
     t0 = time.time()
     try:
@@ -580,6 +591,18 @@ def run_agent_stream(messages: list):
 
         tool_results = []
         for tb in tool_blocks:
+            # 空参数调用：静默处理，不推送前端，标记 is_error 帮助模型理解
+            param_err = _check_tool_params(tb.name, tb.input)
+            if param_err:
+                logger.warning("工具参数为空，跳过: %s", tb.name)
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tb.id,
+                    "content": param_err,
+                    "is_error": True,
+                })
+                continue
+
             yield {"event": "tool_start", "data": {"tool": tb.name, "input": tb.input}}
 
             result = exec_tool(tb.name, tb.input)
