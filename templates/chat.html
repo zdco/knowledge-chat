@@ -57,6 +57,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .input-area button:disabled{background:#bbb;cursor:not-allowed}
 .typing{display:inline-block;width:8px;height:8px;background:var(--primary);border-radius:50%;animation:blink 1s infinite}
 @keyframes blink{0%,100%{opacity:.2}50%{opacity:1}}
+.thinking-indicator{align-self:flex-start;display:flex;align-items:center;gap:8px;padding:10px 16px;color:var(--text-secondary);font-size:13px;flex-shrink:0}
+.thinking-dots{display:flex;gap:4px}
+.thinking-dots span{width:6px;height:6px;background:var(--primary);border-radius:50%;animation:blink 1.2s infinite}
+.thinking-dots span:nth-child(2){animation-delay:0.2s}
+.thinking-dots span:nth-child(3){animation-delay:0.4s}
 .examples{text-align:center;color:var(--text-secondary);margin-top:auto;margin-bottom:auto;padding:40px}
 .examples h2{font-size:20px;margin-bottom:20px;color:var(--text)}
 .example-group{margin-top:18px}
@@ -296,6 +301,13 @@ async function sendMessage(){
   userInput.value='';
   userInput.style.height='auto';
 
+  // 显示思考中指示器
+  const thinkingEl=document.createElement('div');
+  thinkingEl.className='thinking-indicator';
+  thinkingEl.innerHTML='<div class="thinking-dots"><span></span><span></span><span></span></div> 思考中...';
+  chatBox.appendChild(thinkingEl);
+  scrollBottom();
+
   let aiDiv=null;
   let aiText='';
   let fullAiText='';
@@ -324,6 +336,7 @@ async function sendMessage(){
           try{data=JSON.parse(raw)}catch{continue}
 
           if(eventType==='tool_start'){
+            if(thinkingEl.parentNode)thinkingEl.remove();
             // 工具调用前，结束当前 AI 回复块
             if(aiDiv){
               aiDiv=null;
@@ -334,6 +347,7 @@ async function sendMessage(){
             if(currentToolBlock)setToolResult(currentToolBlock,data.output||'');
             currentToolBlock=null;
           }else if(eventType==='text_delta'){
+            if(thinkingEl.parentNode)thinkingEl.remove();
             const delta=data.delta||'';
             // 过滤工具调用间的无意义占位文本（纯标点/空白）
             if(!aiDiv&&/^[\s.,;:!?。，；：！？…·\-]+$/.test(delta))continue;
@@ -347,6 +361,7 @@ async function sendMessage(){
             aiDiv.innerHTML=marked.parse(aiText);
             scrollBottom();
           }else if(eventType==='error'){
+            if(thinkingEl.parentNode)thinkingEl.remove();
             addMsg('ai','<span style="color:red">错误: '+(data.message||'未知错误')+'</span>');
           }else if(eventType==='done'){
             if(fullAiText)history.push({role:'assistant',content:fullAiText});
@@ -357,6 +372,7 @@ async function sendMessage(){
       }
     }
   }catch(e){
+    if(thinkingEl.parentNode)thinkingEl.remove();
     addMsg('ai','<span style="color:red">请求失败: '+e.message+'</span>');
   }
   sending=false;

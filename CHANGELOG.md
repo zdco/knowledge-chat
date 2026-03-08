@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - 对话分享功能：一键生成固定链接，对方打开即可只读查看完整对话
 - 分享页面（share.html）：复用对话样式，只读展示，无 JS 交互
+- 发送消息后显示"思考中..."加载指示器，AI 开始回复或调用工具后自动消失
 - 分享 API（POST /api/share）：基于内容 SHA-256 生成幂等分享 ID
 - search 工具追加 `--exclude-dir=shares` 防止搜索污染分享数据
 
