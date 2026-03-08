@@ -114,6 +114,10 @@ def _write_nav_tree(
 
         markdown = _html_to_markdown(html_path, domain_name)
 
+        # 在内容开头添加页面标题，使文件名关键词可被 grep 搜索到
+        if markdown.strip():
+            markdown = f"# {node.title}\n\n{markdown}"
+
         if node.children:
             # 有子节点 → 创建目录
             node_dir = os.path.join(parent_dir, safe_title)
