@@ -18,6 +18,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Wiki 图片 Web 路由：新增 `/mds/wiki/<domain>/<path>` 路由，支持前端直接展示 Confluence 文档中的图片
 - 新增 beautifulsoup4、markdownify 依赖
 
+### Fixed
+- 修复 memory 记忆功能时序问题：将"先回答再记录"改为"回答时同步写入笔记"，避免回答完成后无执行窗口导致笔记从不触发
+
 ## [0.1.0] - 2026-03-08
 
 ### Added
