@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - search 工具追加 `--exclude-dir=shares` 防止搜索污染分享数据
 
 ### Changed
+- 默认模型从 `claude-opus-4-6` 改为 `MiniMax-M2.5`
 - 所有路由路径简化：`/mds/chat` → `/chat`、`/mds/api/chat` → `/api/chat`、`/mds/wiki/` → `/wiki/`
 - domain.yaml 中 wiki 图片引用路径同步更新
 

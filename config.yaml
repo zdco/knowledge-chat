@@ -7,7 +7,7 @@ api:
   # API 密钥（也可通过环境变量 ANTHROPIC_AUTH_TOKEN 设置，环境变量优先）
   api_key: ""
   # 模型名称
-  model: "claude-opus-4-6"
+  model: "MiniMax-M2.5"
   # 单次回复最大 token 数
   max_tokens: 4096
   # Agent 最大工具调用轮数（防止死循环）
