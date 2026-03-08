@@ -81,6 +81,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .history-item .delete-btn{display:none;background:none;border:none;color:#e53935;cursor:pointer;font-size:14px;padding:2px 6px;margin-left:4px}
 .history-item:hover .delete-btn{display:inline-block}
 .history-empty{text-align:center;color:var(--text-secondary);padding:40px 20px;font-size:14px}
+.share-modal-overlay{position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);z-index:200;display:flex;align-items:center;justify-content:center}
+.share-modal{background:#fff;border-radius:12px;padding:24px;width:420px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.2)}
+.share-modal h3{margin:0 0 16px;font-size:16px;color:var(--text)}
+.share-link-box{display:flex;gap:8px;margin-top:8px}
+.share-link-box input{flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none;color:var(--text)}
+.share-link-box button{padding:8px 16px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap}
+.share-link-box button:hover{background:#1565c0}
+.share-modal .close-btn{margin-top:12px;text-align:right}
+.share-modal .close-btn button{background:none;border:1px solid var(--border);border-radius:8px;padding:6px 16px;font-size:13px;cursor:pointer;color:var(--text-secondary)}
+.share-modal .close-btn button:hover{background:var(--bg)}
 </style>
 </head>
 <body>
@@ -96,6 +106,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 <div class="header">
   <div class="left"><span>🤖</span> 全能 AI 助手</div>
   <div class="header-actions">
+    <button onclick="shareChat()" id="shareBtn">🔗 分享</button>
     <button onclick="toggleHistory()">📋 历史</button>
     <button onclick="newChat()">＋ 新对话</button>
   </div>
@@ -291,7 +302,7 @@ async function sendMessage(){
   let currentToolBlock=null;
 
   try{
-    const resp=await fetch('/mds/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,history:history.slice(0,-1)})});
+    const resp=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,history:history.slice(0,-1)})});
     const reader=resp.body.getReader();
     const decoder=new TextDecoder();
     let buffer='';
@@ -351,6 +362,48 @@ async function sendMessage(){
   sending=false;
   sendBtn.disabled=false;
   userInput.focus();
+}
+
+// ── 分享功能 ──────────────────────────────────
+async function shareChat(){
+  if(sending){alert('请等待回复完成后再分享');return}
+  if(history.length===0){alert('当前没有对话内容可分享');return}
+  const title=history.find(m=>m.role==='user')?.content?.slice(0,50)||'分享的对话';
+  // 克隆对话区域，移除欢迎页
+  const clone=chatBox.cloneNode(true);
+  const welcome=clone.querySelector('#welcome');
+  if(welcome)welcome.remove();
+  const dom=clone.innerHTML;
+  try{
+    const resp=await fetch('/api/share',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,messages:history,dom})});
+    const data=await resp.json();
+    if(!resp.ok){alert(data.error||'分享失败');return}
+    showShareModal(location.origin+data.share_url);
+  }catch(e){alert('分享失败: '+e.message)}
+}
+function showShareModal(url){
+  const overlay=document.createElement('div');
+  overlay.className='share-modal-overlay';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove()};
+  overlay.innerHTML=`<div class="share-modal">
+    <h3>分享链接已生成</h3>
+    <p style="font-size:13px;color:var(--text-secondary);margin:0 0 8px">复制链接发给同事，打开即可查看完整对话</p>
+    <div class="share-link-box">
+      <input type="text" id="shareLinkInput" value="${url}" readonly onclick="this.select()">
+      <button onclick="copyShareLink()">复制</button>
+    </div>
+    <div class="close-btn"><button onclick="this.closest('.share-modal-overlay').remove()">关闭</button></div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#shareLinkInput').select();
+}
+function copyShareLink(){
+  const input=document.getElementById('shareLinkInput');
+  navigator.clipboard.writeText(input.value).then(()=>{
+    const btn=input.nextElementSibling;
+    btn.textContent='已复制';
+    setTimeout(()=>{btn.textContent='复制'},2000);
+  }).catch(()=>{input.select();document.execCommand('copy')});
 }
 
 userInput.addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'});

@@ -149,7 +149,7 @@ prompt: |
   - 查 WebSocket 接入 → 搜索 data/src/WsImp.cpp、WsHqImp.cpp 和 data/doc/行情websocket使用说明.md
   - 查测试用例 → 搜索 data/example/ 下对应的测试目录
   - 查 Confluence 文档 → 用 list_files 浏览 data/wiki/ 目录结构，用 search 搜索关键词
-  - 如果要在回复中展示图片，使用 `/mds/wiki/marketdata_server/_attachments/...` 路径
+  - 如果要在回复中展示图片，使用 `/wiki/marketdata_server/_attachments/...` 路径
 
 examples:
   - "stockHq 接口怎么调用？请求参数和返回结构是什么？"

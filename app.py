@@ -1,8 +1,10 @@
 """Flask 主应用 - 全能 AI 助手"""
+import hashlib
 import json
 import logging
 import os
 import uuid
+from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
 
 from flask import Flask, render_template, request, Response, send_from_directory
@@ -43,6 +45,9 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 start_watcher()
 
+SHARES_DIR = os.path.join(os.path.dirname(__file__), "shares")
+os.makedirs(SHARES_DIR, exist_ok=True)
+
 
 def _get_examples() -> list[dict]:
     """从所有知识域收集示例问题，按域分组"""
@@ -55,12 +60,12 @@ def _get_examples() -> list[dict]:
     return groups
 
 
-@app.route("/mds/chat")
+@app.route("/chat")
 def chat_page():
     return render_template("chat.html", example_groups=_get_examples())
 
 
-@app.route("/mds/api/chat", methods=["POST"])
+@app.route("/api/chat", methods=["POST"])
 def chat_api():
     data = request.get_json()
     user_message = data.get("message", "").strip()
@@ -87,11 +92,56 @@ def chat_api():
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
-@app.route("/mds/wiki/<domain>/<path:filepath>")
+@app.route("/wiki/<domain>/<path:filepath>")
 def serve_wiki_file(domain, filepath):
     """提供 wiki 图片等静态文件访问"""
     wiki_dir = os.path.join(os.path.dirname(__file__), "knowledge", domain, "data", "wiki")
     return send_from_directory(wiki_dir, filepath)
+
+
+@app.route("/api/share", methods=["POST"])
+def share_api():
+    """创建分享链接"""
+    data = request.get_json()
+    title = (data.get("title") or "").strip()
+    messages = data.get("messages")
+    dom = (data.get("dom") or "").strip()
+
+    if not messages or not dom:
+        return {"error": "对话内容为空"}, 400
+
+    content_hash = hashlib.sha256(dom.encode("utf-8")).hexdigest()[:8]
+    share_id = content_hash
+    share_path = os.path.join(SHARES_DIR, f"{share_id}.json")
+
+    if not os.path.exists(share_path):
+        share_data = {
+            "id": share_id,
+            "title": title or "分享的对话",
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "messages": messages,
+            "dom": dom,
+        }
+        with open(share_path, "w", encoding="utf-8") as f:
+            json.dump(share_data, f, ensure_ascii=False, indent=2)
+
+    return {"share_id": share_id, "share_url": f"/share/{share_id}"}
+
+
+@app.route("/share/<share_id>")
+def share_page(share_id):
+    """查看分享的对话"""
+    if not share_id.isalnum() or len(share_id) != 8:
+        return "无效的分享链接", 404
+
+    share_path = os.path.join(SHARES_DIR, f"{share_id}.json")
+    if not os.path.exists(share_path):
+        return "分享不存在或已过期", 404
+
+    with open(share_path, "r", encoding="utf-8") as f:
+        share = json.load(f)
+
+    return render_template("share.html", share=share)
 
 
 if __name__ == "__main__":

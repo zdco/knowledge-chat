@@ -13,5 +13,8 @@ knowledge/_memory/*.md
 # 日志文件
 logs/
 
+# 分享数据（运行时生成）
+shares/
+
 # Confluence 导出 zip 包（体积大，不提交）
 knowledge/*/*.zip

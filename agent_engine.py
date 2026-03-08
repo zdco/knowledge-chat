@@ -416,7 +416,7 @@ def exec_tool(name: str, inp: dict) -> str:
             path = _safe_path(inp.get("path", ""))
             ctx = str(inp.get("context_lines", 3))
             result = subprocess.run(
-                ["grep", "-r", "-n", f"-C{ctx}", "--exclude-dir=logs",
+                ["grep", "-r", "-n", f"-C{ctx}", "--exclude-dir=logs", "--exclude-dir=shares",
                  "--include=*.jce",
                  "--include=*.h", "--include=*.cpp", "--include=*.md",
                  "--include=*.conf", "--include=*.xml", "--include=*.yaml",

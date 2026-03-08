@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- 对话分享功能：一键生成固定链接，对方打开即可只读查看完整对话
+- 分享页面（share.html）：复用对话样式，只读展示，无 JS 交互
+- 分享 API（POST /api/share）：基于内容 SHA-256 生成幂等分享 ID
+- search 工具追加 `--exclude-dir=shares` 防止搜索污染分享数据
+
+### Changed
+- 所有路由路径简化：`/mds/chat` → `/chat`、`/mds/api/chat` → `/api/chat`、`/mds/wiki/` → `/wiki/`
+- domain.yaml 中 wiki 图片引用路径同步更新
+
 ## [0.2.0] - 2026-03-08
 
 ### Added
