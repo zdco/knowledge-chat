@@ -152,6 +152,11 @@ def build_system_prompt() -> str:
         f"- 用 Markdown 表格展示参数",
         f"- 给出代码示例时标注语言",
         f"",
+        f"知识域管理：",
+        f"- 当用户提供文件路径或资料，要求创建/添加知识域时，先用 read_file 读取 {os.path.join(PROJECT_ROOT, 'AI_GUIDE.md')} 获取完整流程",
+        f"- 按照指南扫描分析文件、拷贝资料到 knowledge/<域名>/data/、生成 domain.yaml",
+        f"- domain.yaml 保存后会自动热加载生效，无需重启服务",
+        f"",
         f"你具备以下知识域，请根据用户问题自动判断所属领域并搜索对应路径：",
     ]
 
