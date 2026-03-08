@@ -36,7 +36,7 @@ def _sanitize_filename(name: str) -> str:
 
 
 def _parse_nav_tree(ul_tag: Tag) -> list[_NavNode]:
-    """递归解析 <ul><li><a> 导航树"""
+    """递归解析 <ul><li><a> 导航树（兼容 Confluence 每个子页面独立 <ul> 的结构）"""
     nodes: list[_NavNode] = []
     for li in ul_tag.find_all("li", recursive=False):
         a = li.find("a", recursive=False)
@@ -47,9 +47,8 @@ def _parse_nav_tree(ul_tag: Tag) -> list[_NavNode]:
         if not title or not href:
             continue
         node = _NavNode(title=title, href=href)
-        child_ul = li.find("ul", recursive=False)
-        if child_ul:
-            node.children = _parse_nav_tree(child_ul)
+        for child_ul in li.find_all("ul", recursive=False):
+            node.children.extend(_parse_nav_tree(child_ul))
         nodes.append(node)
     return nodes
 
