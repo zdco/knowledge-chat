@@ -16,13 +16,71 @@
 
 对用户提供的每个文件/目录：
 
-1. 列出所有文件，统计文件类型分布（`.jce`, `.cpp`, `.h`, `.conf`, `.md`, `.xml` 等）
-2. 抽样读取关键文件（接口定义、头文件、README、配置文件），理解该领域的内容
-3. 识别出：
-   - 领域主题（接口定义？运维配置？数据处理？）
-   - 关键概念和术语
-   - 文件组织方式
-   - 用户可能会问的典型问题
+1. 列出所有文件，统计文件类型分布（`.java`, `.cpp`, `.h`, `.jce`, `.conf`, `.md`, `.xml` 等）
+2. 判断知识域类型（可能是混合型），按对应策略深度分析
+3. 抽样读取关键文件，提取写 prompt 所需的具体信息
+
+#### 按场景分析策略
+
+**代码工程**（含 `.java`, `.py`, `.go`, `.cpp`, `.ts` 等源码文件）
+
+必须读取的文件（按优先级）：
+1. 构建文件 — `pom.xml` / `build.gradle` / `package.json` / `CMakeLists.txt` / `go.mod` / `Cargo.toml`，确定技术栈、模块划分、依赖关系
+2. 入口文件 — main 函数、Application 启动类、路由注册文件，理解启动流程和整体架构
+3. 目录结构 — 通过顶层目录命名推断分层模式（如 `controller/service/dao`、`cmd/internal/pkg`、`src/main/java/...`）
+4. 核心抽象 — 关键接口/基类/trait/protocol 定义，理解领域模型
+5. 配置文件 — `application.yml` / `.env` / `config.*`，了解可配置项
+
+需要提取的信息：
+- 技术栈和框架版本（如 Spring Boot 2.7、React 18）
+- 模块/包的划分和职责（不是简单罗列目录名，而是说清每个模块做什么）
+- 核心类/函数及其关系（如"OrderService 调用 PaymentGateway 完成支付"）
+- 关键枚举、常量、错误码（用户高频查询）
+- 特殊约定（命名规则、分包策略、设计模式）
+
+**接口定义**（含 `.jce`, `.proto`, `.thrift`, `.idl`, `.graphql`, OpenAPI `.yaml` 等）
+
+必须读取的文件：
+1. 所有接口定义文件（通常不多），完整理解服务和方法列表
+2. 公共类型定义（枚举、结构体、公共头）
+
+需要提取的信息：
+- 服务列表及每个服务的职责
+- 核心数据结构和字段含义
+- 枚举值及其业务含义
+- 接口间的依赖关系（如"A 接口的返回值是 B 接口的入参"）
+
+**文档/知识库**（以 `.md`, `.rst`, `.txt`, `.pdf`, `.docx` 为主）
+
+必须读取的文件：
+1. 目录索引文件（README、SUMMARY、index、目录页）
+2. 抽样读取各子目录的代表性文档
+
+需要提取的信息：
+- 文档的组织层级和分类体系
+- 覆盖的主题范围
+- 核心术语和概念（建立术语表）
+- 文档间的引用关系
+
+**配置/运维**（以 `.yaml`, `.conf`, `.ini`, `.toml`, `.xml`, `.sh`, `Dockerfile` 等为主）
+
+必须读取的文件：
+1. 主配置文件和环境差异配置（dev/staging/prod）
+2. 部署脚本、Dockerfile、CI/CD 配置
+
+需要提取的信息：
+- 关键配置项及其作用
+- 环境间的差异点
+- 部署架构和依赖关系
+- 常见运维操作流程
+
+**数据库**（配合 `databases` 字段使用）
+
+需要了解的信息（通过用户提供的文档或询问获取）：
+- 核心表及其业务含义
+- 表间关系（外键、业务关联）
+- 关键字段的业务含义（特别是命名不直观的字段）
+- 常用查询场景
 
 ### 第二步：拷贝所有资料到 data/
 
@@ -61,19 +119,9 @@ description: "该领域包含的内容概述"
 # 指向本域数据文件目录（所有资料都在这里）
 data_path: "data"
 
-# 基于文件分析自动生成的 prompt 片段
-# 要求：
-#   - 用 ## 标题开头
-#   - 列出 data/ 下的子目录结构和文件类型
-#   - 列出常见查询类型
-#   - 如果有特殊的命名规则或约定，也要写出来
+# 基于文件分析自动生成的 prompt 片段（见下方 prompt 编写指南）
 prompt: |
-  ## 知识域标题
-  - data/src/ 下是源码实现（*.cpp, *.h）
-  - data/jce/ 下是接口定义（*.jce）
-  - data/doc/ 下是文档（*.md）
-  - 常见查询类型有哪些
-  - 特殊约定或注意事项
+  ...
 
 # 基于文件内容生成 3-5 个典型问题
 # 要求：问题要具体，包含该领域的真实术语和概念
@@ -83,6 +131,132 @@ examples:
 ```
 
 注意：不需要 `search_paths` 字段。`data_path: "data"` 会让引擎自动将 `data/` 目录纳入搜索范围。
+
+#### prompt 编写指南
+
+prompt 是知识域效果的关键。好的 prompt 让 AI 知道"去哪找"和"怎么理解"，差的 prompt 只是重复目录名。
+
+**通用结构**：
+
+```
+## 知识域标题
+
+### 文件结构
+（列出 data/ 下的子目录，说明每个目录的内容和用途）
+
+### 核心概念
+（列出该领域的关键术语、核心抽象、重要约定）
+
+### 查询指引
+（告诉 AI 遇到不同类型问题时应该搜索哪里、怎么搜）
+```
+
+**反面示例**（不要这样写）：
+
+```
+## 交易系统
+- data/src/ 下是源码（*.java）
+- data/doc/ 下是文档（*.md）
+- 常见查询：代码查找、文档查询
+```
+
+问题：只罗列了目录和文件类型，AI 不知道模块职责、核心概念、查询策略。
+
+**各场景 prompt 示例**：
+
+代码工程：
+
+```
+## 交易系统
+
+### 文件结构
+- data/src/ 下是 Spring Boot 工程（Java 17 + Spring Boot 3.1）
+  - com.xxx.trade.order/ — 订单模块：OrderController 接收请求，OrderService 处理业务逻辑，OrderMapper 操作数据库
+  - com.xxx.trade.payment/ — 支付模块：对接支付宝和微信支付，PaymentGateway 是统一入口
+  - com.xxx.trade.risk/ — 风控模块：RiskEngine 在下单前做规则校验
+  - com.xxx.trade.common/ — 公共模块：ErrorCode 错误码枚举、BizException 业务异常
+- data/doc/ 下是设计文档和接口文档
+
+### 核心概念
+- 订单状态机：CREATED → PAYING → PAID → SHIPPING → COMPLETED / CANCELLED
+- 幂等机制：所有写接口通过 requestId 做幂等，见 IdempotentAspect
+- 金额统一用 BigDecimal，单位为分
+- 错误码格式：模块前缀(2位) + 错误编号(4位)，如 OR0001 = 订单不存在
+
+### 查询指引
+- 查接口参数 → 搜索对应 Controller 类
+- 查业务逻辑 → 搜索对应 Service 类
+- 查错误码含义 → 搜索 ErrorCode 枚举
+- 查配置项 → 搜索 application.yml 或 @Value 注解
+```
+
+接口定义：
+
+```
+## 行情主站接口
+
+### 文件结构
+- data/jce/ 下是 JCE 接口定义文件（*.jce），定义了所有请求和响应结构
+  - StockHq.jce — 股票行情接口，包含 getStockHq / getStockList 等方法
+  - MarketData.jce — 市场数据接口，包含 getMarketOverview / getIndexData 等方法
+  - CommonTypes.jce — 公共类型定义，E_MARKET_CODE（市场编码枚举）、HeaderInfo（请求头）
+- data/src/ 下是服务端 C++ 实现（*.cpp, *.h）
+- data/doc/ 下是接口文档
+
+### 核心概念
+- E_MARKET_CODE 枚举：0=深圳 1=上海 2=北京
+- HeaderInfo 是所有请求的公共头，包含 userId / version / timestamp
+- 行情数据精度：价格字段统一放大 10000 倍存储为整数
+
+### 查询指引
+- 查接口参数和返回值 → 搜索 data/jce/ 下的 .jce 文件
+- 查枚举值含义 → 搜索 CommonTypes.jce
+- 查具体实现逻辑 → 搜索 data/src/ 下对应的 Imp.cpp 文件
+```
+
+文档/知识库：
+
+```
+## 产品运营手册
+
+### 文件结构
+- data/product/ — 产品说明文档，按功能模块组织（用户管理、订单管理、报表）
+- data/ops/ — 运营操作手册，包含日常操作流程和应急预案
+- data/faq/ — 常见问题汇总，按客户反馈分类
+
+### 核心概念
+- 用户等级体系：普通用户 / VIP / SVIP，影响费率和权限
+- "T+1 结算"：交易日次日完成资金清算
+- 文档中"灰度"指按用户 ID 尾号分批放量
+
+### 查询指引
+- 查功能说明 → 搜索 data/product/
+- 查操作步骤 → 搜索 data/ops/
+- 查历史问题 → 搜索 data/faq/
+```
+
+配置/运维：
+
+```
+## 部署与运维
+
+### 文件结构
+- data/conf/ — 各环境配置文件
+  - dev/ prod/ staging/ — 按环境区分，主要差异在数据库连接和日志级别
+  - nginx/ — Nginx 配置，包含反向代理和限流规则
+- data/scripts/ — 运维脚本（部署、回滚、健康检查）
+- data/docker/ — Dockerfile 和 docker-compose 配置
+
+### 核心概念
+- 部署架构：Nginx → 2 台应用服务器（蓝绿部署）→ MySQL 主从
+- 配置优先级：环境变量 > 环境配置文件 > 默认配置
+- 日志路径统一在 /data/logs/<服务名>/，按天轮转
+
+### 查询指引
+- 查某个配置项 → 搜索 data/conf/ 下的配置文件
+- 查部署流程 → 搜索 data/scripts/deploy
+- 查环境差异 → 对比 dev/ 和 prod/ 下的同名配置文件
+```
 
 ### 第四步：创建目录结构
 
@@ -227,10 +401,25 @@ data_path: "data"
 
 prompt: |
   ## 行情主站接口
-  - data/jce/ 下是 JCE 接口定义文件（*.jce），定义了所有请求和响应结构
+
+  ### 文件结构
+  - data/jce/ 下是 JCE 接口定义文件（*.jce）
+    - StockHq.jce — 股票行情接口，包含 getStockHq / getStockList 等方法
+    - MarketData.jce — 市场数据接口，包含 getMarketOverview / getIndexData 等方法
+    - CommonTypes.jce — 公共类型定义，E_MARKET_CODE（市场编码枚举）、HeaderInfo（请求头）
   - data/src/ 下是服务端 C++ 实现（*.cpp, *.h）
+    - BasicHqImp.cpp/h — 基础行情接口实现
   - data/doc/ 下是接口文档（*.md）
-  - 常见查询：接口参数、枚举值、数据结构、调用示例
+
+  ### 核心概念
+  - E_MARKET_CODE 枚举：0=深圳 1=上海 2=北京
+  - HeaderInfo 是所有请求的公共头，包含 userId / version / timestamp
+  - 行情数据精度：价格字段统一放大 10000 倍存储为整数
+
+  ### 查询指引
+  - 查接口参数和返回值 → 搜索 data/jce/ 下的 .jce 文件
+  - 查枚举值含义 → 搜索 CommonTypes.jce
+  - 查具体实现逻辑 → 搜索 data/src/ 下对应的 Imp.cpp 文件
 
 examples:
   - "stockHq 接口怎么调用？请求参数是什么？"

@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - AI 学习记忆机制：AI 可将有价值的结论、纠正、隐性知识写入 memory 笔记，下次通过 search 检索复用，实现自我进化学习
+
+### Changed
+- AI_GUIDE.md 知识域扫描分析按场景分类（代码工程/接口定义/文档知识库/配置运维/数据库），各场景有针对性的分析策略
+- AI_GUIDE.md prompt 编写指南：新增通用结构模板、反面示例、五种场景的高质量 prompt 示例
 - `run_python` 工具：支持执行 Python 代码，可用于数据库查询和数据分析
 - 知识域数据库配置：domain.yaml 新增可选 `databases` 字段，配置数据库连接信息后 AI 自动生成代码查询
 - 数据库驱动依赖：新增 pymysql、oracledb、pandas
