@@ -133,6 +133,60 @@ knowledge/
 | `search_paths` | 否 | 额外搜索路径（一般不需要，data_path 已覆盖） |
 | `prompt` | 是 | prompt 片段，合并到总 system prompt |
 | `examples` | 否 | 示例问题列表，显示在欢迎页 |
+| `databases` | 否 | 数据库连接配置列表，AI 可通过 run_python 工具查询 |
+
+## 数据库知识域
+
+如果知识域涉及数据库查询和分析，可以在 domain.yaml 中配置 `databases` 字段，AI 会自动使用 `run_python` 工具生成 Python 代码连接数据库。
+
+### 支持的数据库类型
+
+| 类型 | 驱动 | 必填参数 |
+|------|------|----------|
+| mysql | pymysql | host, port, database, user, password |
+| oracle | oracledb | host, port, service_name, user, password |
+
+### 配置示例
+
+```yaml
+name: "业务数据分析"
+description: "业务数据库查询与数据分析"
+data_path: "data"
+
+databases:
+  - name: 生产库
+    type: oracle
+    host: 10.0.0.1
+    port: 1521
+    service_name: orcl
+    user: readonly
+    password: xxx
+  - name: 业务库
+    type: mysql
+    host: 10.0.0.2
+    port: 3306
+    database: biz_db
+    user: readonly
+    password: xxx
+
+prompt: |
+  ## 业务数据分析
+  - 可查询生产库（Oracle）和业务库（MySQL）中的数据
+  - 常见查询：业务指标统计、数据质量检查、趋势分析
+
+examples:
+  - "查一下业务库 orders 表今天有多少条数据？"
+  - "统计生产库中各部门的用户数量分布"
+```
+
+### AI 生成知识域时的注意事项
+
+当用户提到知识域涉及数据库时，应主动询问：
+1. 数据库类型（MySQL / Oracle）
+2. 连接信息（host、port、库名/service_name）
+3. 账号密码（建议使用只读账号）
+
+将收集到的信息写入 domain.yaml 的 `databases` 字段。
 
 ## 完整示例
 

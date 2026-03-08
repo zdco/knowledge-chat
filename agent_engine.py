@@ -169,6 +169,42 @@ def build_system_prompt() -> str:
         if abs_data_path:
             parts.append(f"  数据文件目录：{abs_data_path}")
 
+    # 注入数据库连接信息
+    db_sections = []
+    for domain in KNOWLEDGE_DOMAINS:
+        databases = domain.get("databases")
+        if not databases:
+            continue
+        domain_name = domain.get("name", "未命名")
+        for db in databases:
+            db_type = db.get("type", "unknown")
+            info_parts = [f"  - 名称: {db.get('name', '未命名')}"]
+            info_parts.append(f"    类型: {db_type}")
+            info_parts.append(f"    host: {db.get('host', '')}")
+            info_parts.append(f"    port: {db.get('port', '')}")
+            if db.get("service_name"):
+                info_parts.append(f"    service_name: {db['service_name']}")
+            if db.get("database"):
+                info_parts.append(f"    database: {db['database']}")
+            info_parts.append(f"    user: {db.get('user', '')}")
+            info_parts.append(f"    password: {db.get('password', '')}")
+            db_sections.append((domain_name, "\n".join(info_parts), db_type))
+
+    if db_sections:
+        parts.append("")
+        parts.append("## 可用数据库")
+        parts.append("你可以使用 run_python 工具编写 Python 代码连接以下数据库进行查询和分析：")
+        for domain_name, info, db_type in db_sections:
+            parts.append(f"")
+            parts.append(f"【{domain_name}】")
+            parts.append(info)
+        parts.append("")
+        parts.append("数据库驱动使用说明：")
+        parts.append("- MySQL: 使用 pymysql 库连接")
+        parts.append("- Oracle: 使用 oracledb 库连接（thin 模式，无需 Oracle Client）")
+        parts.append("- 推荐使用 pandas 读取查询结果并格式化输出")
+        parts.append("- 查询时注意加 LIMIT/ROWNUM 限制返回行数，避免数据量过大")
+
     return "\n".join(parts)
 
 
@@ -257,6 +293,17 @@ TOOLS = [
                 "url": {"type": "string", "description": "网页 URL"},
             },
             "required": ["url"],
+        },
+    },
+    {
+        "name": "run_python",
+        "description": "执行 Python 代码，可用于数据库查询、数据分析、数据处理等。",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "code": {"type": "string", "description": "要执行的 Python 代码"},
+            },
+            "required": ["code"],
         },
     },
 ]
@@ -389,6 +436,25 @@ def exec_tool(name: str, inp: dict) -> str:
             req = urllib.request.Request(inp["url"], headers={"User-Agent": "Mozilla/5.0"})
             with urllib.request.urlopen(req, timeout=15) as resp:
                 output = resp.read().decode("utf-8", errors="replace")
+
+        elif name == "run_python":
+            import tempfile
+            code = inp["code"]
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as f:
+                f.write(code)
+                tmp_path = f.name
+            try:
+                timeout = CONFIG["tools"].get("python_timeout", 300)
+                result = subprocess.run(
+                    ["python3", tmp_path],
+                    capture_output=True, text=True,
+                    timeout=timeout, cwd=PROJECT_ROOT,
+                )
+                output = (result.stdout + result.stderr).strip() or "(无输出)"
+            except subprocess.TimeoutExpired:
+                output = f"执行超时（{timeout}秒），代码已终止"
+            finally:
+                os.unlink(tmp_path)
 
         else:
             output = f"未知工具: {name}"

@@ -32,3 +32,21 @@ prompt: |
 examples:
   - "示例问题 1？"
   - "示例问题 2？"
+
+# 可选：数据库连接配置
+# AI 会使用 run_python 工具生成 Python 代码连接这些数据库进行查询和分析
+# databases:
+#   - name: 生产库
+#     type: oracle          # 数据库类型：mysql / oracle
+#     host: 10.0.0.1
+#     port: 1521
+#     service_name: orcl    # Oracle 专用
+#     user: readonly
+#     password: xxx
+#   - name: 业务库
+#     type: mysql
+#     host: 10.0.0.2
+#     port: 3306
+#     database: biz_db      # MySQL 专用
+#     user: readonly
+#     password: xxx

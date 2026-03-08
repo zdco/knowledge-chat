@@ -30,3 +30,5 @@ tools:
   max_output_length: 15000
   # 工具结果推送给前端的最大字符数
   max_display_length: 2000
+  # run_python 工具超时时间（秒）
+  python_timeout: 300

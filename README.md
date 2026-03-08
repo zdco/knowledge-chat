@@ -125,3 +125,4 @@ knowledge-chat/
 | glob | 按模式匹配文件路径 |
 | bash | 执行 shell 命令 |
 | web_fetch | 抓取网页内容 |
+| run_python | 执行 Python 代码，可用于数据库查询和数据分析 |

@@ -6,3 +6,6 @@ watchdog
 openpyxl
 python-docx
 python-pptx
+pymysql
+oracledb
+pandas

@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `run_python` 工具：支持执行 Python 代码，可用于数据库查询和数据分析
+- 知识域数据库配置：domain.yaml 新增可选 `databases` 字段，配置数据库连接信息后 AI 自动生成代码查询
+- 数据库驱动依赖：新增 pymysql、oracledb、pandas
 - 知识域热加载：监听 knowledge/ 目录下 domain.yaml 的变化，自动重新加载知识域和 system prompt，无需重启服务
 - Office 文件解析支持：`read_file` 工具支持读取 `.xlsx`/`.xls`/`.docx`/`.pptx` 文件，`search` 工具支持搜索 Office 文件中的关键词
 
