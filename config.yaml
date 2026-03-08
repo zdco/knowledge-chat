@@ -32,3 +32,9 @@ tools:
   max_display_length: 2000
   # run_python 工具超时时间（秒）
   python_timeout: 300
+
+# 日志配置
+logging:
+  level: "INFO"
+  file: "logs/app.log"
+  backup_days: 30

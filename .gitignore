@@ -9,3 +9,6 @@ knowledge/*/data/
 knowledge/*/memory/
 knowledge/_memory/*.md
 !knowledge/_memory/README.md
+
+# 日志文件
+logs/

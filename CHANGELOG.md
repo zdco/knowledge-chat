@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- 完善服务日志记录：配置 logging 格式、console + 文件双输出、按天轮转保留 30 天
+- 请求入口日志：记录用户消息摘要和请求来源 IP
+- AI 调用日志：记录每轮 API 调用、token 用量、异常堆栈
+- 工具执行日志：记录工具名称、参数、耗时、结果长度、异常堆栈
+- config.yaml 新增 logging 配置段（level / file / backup_days）
+- search 工具增加 --exclude-dir=logs 防止搜索污染
+
 ## [0.1.0] - 2026-03-08
 
 ### Added

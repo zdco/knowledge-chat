@@ -3,6 +3,7 @@ import os
 import json
 import subprocess
 import glob as glob_mod
+import time
 import urllib.request
 import urllib.error
 import threading
@@ -388,13 +389,16 @@ def _read_office_file(fpath: str) -> str:
 
 def exec_tool(name: str, inp: dict) -> str:
     """执行工具，返回结果字符串"""
+    logger.info("执行工具: %s, 参数: %s", name, json.dumps(inp, ensure_ascii=False)[:500])
+    t0 = time.time()
     try:
         if name == "search":
             keyword = inp["keyword"]
             path = _safe_path(inp.get("path", ""))
             ctx = str(inp.get("context_lines", 3))
             result = subprocess.run(
-                ["grep", "-r", "-n", f"-C{ctx}", "--include=*.jce",
+                ["grep", "-r", "-n", f"-C{ctx}", "--exclude-dir=logs",
+                 "--include=*.jce",
                  "--include=*.h", "--include=*.cpp", "--include=*.md",
                  "--include=*.conf", "--include=*.xml", "--include=*.yaml",
                  "--include=*.yml", "--include=*.txt", "--include=*.sh",
@@ -489,10 +493,13 @@ def exec_tool(name: str, inp: dict) -> str:
             output = f"未知工具: {name}"
 
     except Exception as e:
+        logger.error("工具执行错误: %s, %s", name, e, exc_info=True)
         output = f"工具执行错误: {e}"
 
+    elapsed = time.time() - t0
     if len(output) > MAX_OUTPUT_LEN:
         output = output[:MAX_OUTPUT_LEN] + f"\n... (截断，共 {len(output)} 字符)"
+    logger.info("工具完成: %s, 耗时: %.2fs, 结果长度: %d", name, elapsed, len(output))
     return output
 
 
@@ -502,7 +509,8 @@ def run_agent_stream(messages: list):
     """Agent 循环：流式调用 Claude，自动执行工具，yield SSE 事件"""
     client = anthropic.Anthropic(base_url=BASE_URL, api_key=API_KEY)
 
-    for _ in range(MAX_ITERATIONS):
+    for iteration in range(MAX_ITERATIONS):
+        logger.info("调用 Claude API, 第 %d 轮", iteration + 1)
         try:
             with client.messages.stream(
                 model=MODEL,
@@ -520,7 +528,10 @@ def run_agent_stream(messages: list):
 
                 final_message = stream.get_final_message()
 
+            logger.info("API 返回, usage: %s", final_message.usage)
+
         except Exception as e:
+            logger.error("API 调用失败: %s", e, exc_info=True)
             yield {"event": "error", "data": {"message": str(e)}}
             yield {"event": "done", "data": {}}
             return
@@ -549,5 +560,6 @@ def run_agent_stream(messages: list):
 
         messages.append({"role": "user", "content": tool_results})
 
+    logger.warning("达到最大迭代次数 %d", MAX_ITERATIONS)
     yield {"event": "error", "data": {"message": "达到最大迭代次数"}}
     yield {"event": "done", "data": {}}

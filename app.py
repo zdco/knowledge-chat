@@ -1,8 +1,35 @@
 """Flask 主应用 - 全能 AI 助手"""
 import json
+import logging
+import os
+from logging.handlers import TimedRotatingFileHandler
+
 from flask import Flask, render_template, request, Response
 
 from agent_engine import run_agent_stream, CONFIG, KNOWLEDGE_DOMAINS, start_watcher
+
+# ── 日志初始化 ────────────────────────────────────────────
+_log_cfg = CONFIG.get("logging", {})
+_log_level = getattr(logging, _log_cfg.get("level", "INFO").upper(), logging.INFO)
+_log_file = _log_cfg.get("file", "logs/app.log")
+_log_backup_days = _log_cfg.get("backup_days", 30)
+_log_format = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
+
+os.makedirs(os.path.dirname(_log_file), exist_ok=True)
+
+_formatter = logging.Formatter(_log_format)
+
+_console_handler = logging.StreamHandler()
+_console_handler.setFormatter(_formatter)
+
+_file_handler = TimedRotatingFileHandler(
+    _log_file, when="midnight", backupCount=_log_backup_days, encoding="utf-8"
+)
+_file_handler.setFormatter(_formatter)
+
+logging.basicConfig(level=_log_level, handlers=[_console_handler, _file_handler])
+
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 start_watcher()
@@ -32,6 +59,8 @@ def chat_api():
 
     if not user_message:
         return {"error": "消息不能为空"}, 400
+
+    logger.info("收到请求: %s [来源: %s]", user_message[:200], request.remote_addr)
 
     messages = list(history)
     messages.append({"role": "user", "content": user_message})
