@@ -73,7 +73,7 @@ export ANTHROPIC_MODEL="claude-haiku-4-5-20251001"
 
 ### 用 AI 自动生成
 
-项目提供了 `knowledge/AI_GUIDE.md`，这是一份 AI 工作指令。将它加载到任意 AI 助手（如 Claude、Cursor、Kiro 等）的上下文中，然后告诉 AI 你的源码/文档路径，AI 会自动完成：
+项目提供了 `AI_GUIDE.md`，这是一份 AI 工作指令。将它加载到任意 AI 助手（如 Claude、Cursor、Kiro 等）的上下文中，然后告诉 AI 你的源码/文档路径，AI 会自动完成：
 
 1. 扫描分析文件内容和结构
 2. 将所有资料整理拷贝到 `data/` 目录
@@ -95,12 +95,12 @@ knowledge-chat/
 ├── app.py                  # Flask 主应用
 ├── agent_engine.py         # Agent 引擎（知识域加载 + 工具 + API 调用）
 ├── config.yaml             # 全局配置
+├── AI_GUIDE.md             # AI 生成知识域的工作指南
 ├── start.sh                # 启动脚本
 ├── requirements.txt        # Python 依赖
 ├── Dockerfile
 ├── docker-compose.yml
 ├── knowledge/              # 知识域目录
-│   ├── AI_GUIDE.md         # AI 生成知识域的工作指南
 │   ├── _template/          # 模板（不会被引擎加载）
 │   │   ├── domain.yaml
 │   │   └── data/
@@ -126,3 +126,10 @@ knowledge-chat/
 | bash | 执行 shell 命令 |
 | web_fetch | 抓取网页内容 |
 | run_python | 执行 Python 代码，可用于数据库查询和数据分析 |
+
+### 扩展工具
+
+工具定义在 `agent_engine.py` 的 `TOOLS` 列表中，执行逻辑在 `exec_tool()` 函数中。添加新工具只需：
+
+1. 在 `TOOLS` 列表中添加工具定义（name、description、input_schema）
+2. 在 `exec_tool()` 中添加对应的 `elif` 分支

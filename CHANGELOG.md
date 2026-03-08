@@ -20,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 修复工具调用后正文首字被误过滤丢失的问题
 
 ### Changed
+- `AI_GUIDE.md` 从 `knowledge/` 移到项目根目录
+- 删除 `DEV_GUIDE.md`，扩展工具说明合并到 README
 - 工具调用状态标识（执行中/完成）移到工具名前面，更直观
 - 工具调用块改为浅色风格，减少与正文消息的视觉反差
 - 知识域数据文件（knowledge/*/data/）加入 gitignore，不再提交到仓库

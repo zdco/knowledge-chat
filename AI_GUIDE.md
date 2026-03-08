@@ -107,7 +107,6 @@ examples:
 
 ```
 knowledge/
-├── AI_GUIDE.md              # 本文件
 ├── _template/               # 模板目录（不会被引擎加载）
 │   ├── domain.yaml
 │   └── data/
