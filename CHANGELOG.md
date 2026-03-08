@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Confluence 转换跳过空内容页面，不再生成空 Markdown 文件
 - Confluence 转换时将页面标题作为 H1 写入 Markdown 开头，使按标题关键词搜索能命中文件
 - 修复 `PROJECT_ROOT` 路径计算错误（指向 `/mnt` 而非项目目录），导致搜索工具找不到文件或扫描超时
+- 工具执行增加必填参数校验，模型传空参数时返回友好提示而非抛出 KeyError
 
 ## [0.2.0] - 2026-03-08
 

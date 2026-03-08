@@ -409,6 +409,21 @@ def _read_office_file(fpath: str) -> str:
 def exec_tool(name: str, inp: dict) -> str:
     """执行工具，返回结果字符串"""
     logger.info("执行工具: %s, 参数: %s", name, json.dumps(inp, ensure_ascii=False)[:500])
+
+    # 校验必填参数，防止模型返回空参数导致 KeyError
+    required_fields = {
+        "search": ["keyword"],
+        "read_file": ["path"],
+        "write_file": ["path", "content"],
+        "glob": ["pattern"],
+        "bash": ["command"],
+        "web_fetch": ["url"],
+        "run_python": ["code"],
+    }
+    missing = [f for f in required_fields.get(name, []) if f not in inp or not inp[f]]
+    if missing:
+        return f"参数错误：缺少必填参数 {', '.join(missing)}，请重新调用并提供完整参数"
+
     t0 = time.time()
     try:
         if name == "search":
