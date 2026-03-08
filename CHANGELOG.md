@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-08
+
 ### Added
 - 对话分享功能：一键生成固定链接，对方打开即可只读查看完整对话
 - 分享页面（share.html）：复用对话样式，只读展示，无 JS 交互
