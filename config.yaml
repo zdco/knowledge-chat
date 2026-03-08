@@ -1,13 +1,13 @@
 # 全能 AI 助手 - 配置文件
 
-# API 配置
+# API 配置（环境变量优先于此处配置：ANTHROPIC_BASE_URL / ANTHROPIC_AUTH_TOKEN / ANTHROPIC_MODEL）
 api:
   # 代理地址（含 /v1 自动走 OpenAI 格式，否则走 Anthropic 格式）
-  base_url: "http://coding.whup.com/"
-  # API 密钥（也可通过环境变量 ANTHROPIC_AUTH_TOKEN 设置，环境变量优先）
+  base_url: "http://coding.whup.com/v1"
+  # API 密钥
   api_key: ""
   # 模型名称
-  model: "claude-haiku-4-5-20251001"
+  model: "glm-5"
   # 单次回复最大 token 数
   max_tokens: 4096
   # Agent 最大工具调用轮数（防止死循环）

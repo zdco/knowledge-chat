@@ -38,13 +38,12 @@ MAX_ITERATIONS = CONFIG["api"]["max_iterations"]
 MAX_OUTPUT_LEN = CONFIG["tools"]["max_output_length"]
 MAX_DISPLAY_LEN = CONFIG["tools"]["max_display_length"]
 
-# API 格式：显式配置 > 根据 config 中 base_url 自动判断（含 /v1 用 openai，否则 anthropic）
+# API 格式：显式配置 > 根据实际生效的 BASE_URL 自动判断（含 /v1 用 openai，否则 anthropic）
 _api_format_cfg = CONFIG["api"].get("api_format", "").lower()
 if _api_format_cfg in ("openai", "anthropic"):
     API_FORMAT = _api_format_cfg
 else:
-    _cfg_url = CONFIG["api"]["base_url"]
-    API_FORMAT = "openai" if "/v1" in _cfg_url else "anthropic"
+    API_FORMAT = "openai" if "/v1" in BASE_URL else "anthropic"
 
 PROJECT_ROOT = os.path.abspath(_DIR)
 
