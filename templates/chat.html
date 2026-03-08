@@ -35,7 +35,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .tool-block summary::-webkit-details-marker{display:none}
 .tool-block summary .tool-name{color:var(--tool-header)}
 .tool-block summary .tool-preview{color:var(--tool-dim);font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
-.tool-block summary .tool-status{margin-left:auto;font-size:11px;font-weight:400}
+.tool-block summary .tool-status{font-size:11px;font-weight:400}
 .tool-block summary .tool-status.running{color:#4ec9b0}
 .tool-block summary .tool-status.done{color:var(--tool-dim)}
 .tool-block .tool-detail{padding:0 14px 10px;border-top:1px solid #333}
@@ -243,9 +243,9 @@ function addToolBlock(toolName,input){
   block.className='tool-block';
   block.innerHTML=`
     <summary>
+      <span class="tool-status running"><span class="tool-spinner"></span> 执行中</span>
       <span class="tool-name">${escHtml(toolName)}</span>
       <span class="tool-preview">${escHtml(preview)}</span>
-      <span class="tool-status running"><span class="tool-spinner"></span> 执行中</span>
     </summary>
     <div class="tool-detail">
       <div class="label">输入参数</div>
@@ -319,13 +319,16 @@ async function sendMessage(){
             if(currentToolBlock)setToolResult(currentToolBlock,data.output||'');
             currentToolBlock=null;
           }else if(eventType==='text_delta'){
+            const delta=data.delta||'';
+            // 过滤工具调用间的无意义占位文本
+            if(!aiDiv&&delta.trim().length<=1)continue;
             // 工具调用结束后的文本，创建新的 AI 消息块
             if(!aiDiv){
               aiDiv=addMsg('ai','');
               aiText='';
             }
-            aiText+=data.delta||'';
-            fullAiText+=data.delta||'';
+            aiText+=delta;
+            fullAiText+=delta;
             aiDiv.innerHTML=marked.parse(aiText);
             scrollBottom();
           }else if(eventType==='error'){
