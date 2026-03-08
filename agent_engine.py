@@ -74,6 +74,23 @@ def load_knowledge_domains() -> list[dict]:
                 if rel_data_path not in search_paths:
                     search_paths.append(rel_data_path)
                     domain["search_paths"] = search_paths
+
+            # Confluence zip 自动转换
+            confluence_zip = domain.get("confluence_zip")
+            if confluence_zip:
+                zip_path = os.path.join(domain_dir, confluence_zip)
+                wiki_dir = os.path.join(
+                    abs_data_path if data_path else domain_dir, "wiki"
+                )
+                if os.path.isfile(zip_path):
+                    try:
+                        from confluence_converter import convert_confluence_zip
+                        convert_confluence_zip(zip_path, wiki_dir, domain.get("name", dname))
+                    except Exception as e:
+                        logging.getLogger(__name__).error(
+                            "Confluence 转换失败 [%s]: %s", dname, e, exc_info=True
+                        )
+
             domains.append(domain)
     return domains
 

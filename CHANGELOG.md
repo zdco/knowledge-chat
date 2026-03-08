@@ -14,6 +14,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 工具执行日志：记录工具名称、参数、耗时、结果长度、异常堆栈
 - config.yaml 新增 logging 配置段（level / file / backup_days）
 - search 工具增加 --exclude-dir=logs 防止搜索污染
+- Confluence ZIP 自动转换：服务启动时检测 domain.yaml 中的 `confluence_zip` 字段，自动将 Confluence 导出的 HTML zip 包转换为 Markdown + 图片，按导航层级组织目录结构
+- Wiki 图片 Web 路由：新增 `/mds/wiki/<domain>/<path>` 路由，支持前端直接展示 Confluence 文档中的图片
+- 新增 beautifulsoup4、markdownify 依赖
 
 ## [0.1.0] - 2026-03-08
 

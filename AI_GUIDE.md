@@ -62,6 +62,19 @@
 - 核心术语和概念（建立术语表）
 - 文档间的引用关系
 
+**Confluence 导出包**（zip 文件，含 HTML + 图片）
+
+处理方式：
+1. 将 zip 文件放到知识域根目录下（与 domain.yaml 同级）
+2. domain.yaml 中添加 `confluence_zip: "文件名.zip"`
+3. 服务启动时自动解压转换为 Markdown，输出到 data/wiki/ 下，按 Confluence 页面层级组织目录
+4. 图片保留在 data/wiki/_attachments/ 下，可通过 web 路由访问
+
+prompt 编写要点：
+- 说明 data/wiki/ 下是 Confluence 导出的文档，按页面层级组织
+- 提示 AI 用 list_files 浏览 data/wiki/ 目录结构，用 search 搜索关键词
+- 如果要在回复中展示图片，使用 `/mds/wiki/<域名>/_attachments/...` 路径
+
 **配置/运维**（以 `.yaml`, `.conf`, `.ini`, `.toml`, `.xml`, `.sh`, `Dockerfile` 等为主）
 
 必须读取的文件：

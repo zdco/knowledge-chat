@@ -5,7 +5,7 @@ import os
 import uuid
 from logging.handlers import TimedRotatingFileHandler
 
-from flask import Flask, render_template, request, Response
+from flask import Flask, render_template, request, Response, send_from_directory
 
 from agent_engine import run_agent_stream, CONFIG, KNOWLEDGE_DOMAINS, start_watcher, request_id_var
 
@@ -85,6 +85,13 @@ def chat_api():
 
     return Response(generate(), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.route("/mds/wiki/<domain>/<path:filepath>")
+def serve_wiki_file(domain, filepath):
+    """提供 wiki 图片等静态文件访问"""
+    wiki_dir = os.path.join(os.path.dirname(__file__), "knowledge", domain, "data", "wiki")
+    return send_from_directory(wiki_dir, filepath)
 
 
 if __name__ == "__main__":

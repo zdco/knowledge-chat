@@ -54,3 +54,8 @@ examples:
 #     database: biz_db      # MySQL 专用
 #     user: readonly
 #     password: xxx
+
+# 可选：Confluence 导出的 HTML zip 包
+# 将 zip 文件放在知识域根目录下（与 domain.yaml 同级），填写文件名
+# 服务启动时自动解压转换为 Markdown，输出到 data/wiki/ 下
+# confluence_zip: "Confluence-space-export-xxx.html.zip"
