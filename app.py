@@ -9,7 +9,8 @@ from logging.handlers import TimedRotatingFileHandler
 
 from flask import Flask, render_template, request, Response, send_from_directory
 
-from agent_engine import run_agent_stream, CONFIG, KNOWLEDGE_DOMAINS, start_watcher, request_id_var
+from agent_engine import run_agent_stream, CONFIG, KNOWLEDGE_DOMAINS, start_watcher, request_id_var, \
+    BASE_URL, MODEL, API_FORMAT
 
 # ── 日志初始化 ────────────────────────────────────────────
 _log_cfg = CONFIG.get("logging", {})
@@ -149,8 +150,10 @@ def share_page(share_id):
 
 if __name__ == "__main__":
     server_cfg = CONFIG.get("server", {})
-    app.run(
-        host=server_cfg.get("host", "0.0.0.0"),
-        port=server_cfg.get("port", 5001),
-        threaded=True,
-    )
+    host = server_cfg.get("host", "0.0.0.0")
+    port = server_cfg.get("port", 5001)
+    print(f"模型: {MODEL}")
+    print(f"地址: {BASE_URL}")
+    print(f"格式: {API_FORMAT}")
+    print(f"访问: http://localhost:{port}/chat")
+    app.run(host=host, port=port, threaded=True)
