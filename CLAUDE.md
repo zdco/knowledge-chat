@@ -18,3 +18,12 @@
 - type 取值：`feat`（新功能）、`fix`（修复）、`docs`（文档）、`refactor`（重构）、`chore`（杂项）
 - 示例：`fix: 修复工具调用时黑框被压缩的布局问题`
 - 每个独立的变更单独提交，不要把不相关的改动混在一起
+
+## 发版
+
+当用户说"发版 x.x.x"时，执行以下操作：
+
+1. 将 `CHANGELOG.md` 中 `[Unreleased]` 下的内容移到新版本号下，格式：`## [x.x.x] - YYYY-MM-DD`
+2. 保留一个空的 `[Unreleased]` 段落在最上方
+3. 提交：`chore: release vx.x.x`
+4. 打 git tag：`vx.x.x`
