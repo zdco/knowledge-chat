@@ -29,16 +29,19 @@ class _RequestIdFilter(logging.Filter):
 
 _formatter = logging.Formatter(_log_format)
 
+_req_id_filter = _RequestIdFilter()
+
 _console_handler = logging.StreamHandler()
 _console_handler.setFormatter(_formatter)
+_console_handler.addFilter(_req_id_filter)
 
 _file_handler = TimedRotatingFileHandler(
     _log_file, when="midnight", backupCount=_log_backup_days, encoding="utf-8"
 )
 _file_handler.setFormatter(_formatter)
+_file_handler.addFilter(_req_id_filter)
 
 logging.basicConfig(level=_log_level, handlers=[_console_handler, _file_handler])
-logging.getLogger().addFilter(_RequestIdFilter())
 
 logger = logging.getLogger(__name__)
 

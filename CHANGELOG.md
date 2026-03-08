@@ -16,6 +16,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 所有路由路径简化：`/mds/chat` → `/chat`、`/mds/api/chat` → `/api/chat`、`/mds/wiki/` → `/wiki/`
 - domain.yaml 中 wiki 图片引用路径同步更新
 
+### Fixed
+- 修复日志 `request_id` 字段缺失导致启动报错：将 filter 从 root logger 移到 handler 上，确保子 logger 的日志也能注入 request_id
+
 ## [0.2.0] - 2026-03-08
 
 ### Added

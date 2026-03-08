@@ -24,5 +24,5 @@ source "$VENV_DIR/bin/activate"
 pip install -q -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 echo "启动全能 AI 助手..."
-echo "访问地址: http://localhost:5001/mds/chat"
+echo "访问地址: http://localhost:5001/chat"
 python app.py
