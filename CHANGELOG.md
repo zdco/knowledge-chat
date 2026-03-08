@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-08
+
 ### Added
 - 完善服务日志记录：配置 logging 格式、console + 文件双输出、按天轮转保留 30 天
 - 请求级 request_id：每条日志携带 8 位请求 ID，可关联同一请求的全链路日志
