@@ -13,6 +13,9 @@ import anthropic
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+# Office 文件扩展名集合
+_OFFICE_EXTS = {'.xlsx', '.xls', '.docx', '.pptx'}
+
 # ── 加载配置 ──────────────────────────────────────────────
 
 _DIR = os.path.dirname(__file__)
@@ -269,6 +272,44 @@ def _safe_path(rel: str) -> str:
     return abs_path
 
 
+def _read_office_file(fpath: str) -> str:
+    """根据扩展名解析 Office 文件，返回纯文本内容"""
+    ext = os.path.splitext(fpath)[1].lower()
+
+    if ext in ('.xlsx', '.xls'):
+        import openpyxl
+        wb = openpyxl.load_workbook(fpath, read_only=True, data_only=True)
+        parts = []
+        for sheet in wb.sheetnames:
+            ws = wb[sheet]
+            parts.append(f"=== Sheet: {sheet} ===")
+            for row in ws.iter_rows(values_only=True):
+                parts.append("\t".join(str(c) if c is not None else "" for c in row))
+        wb.close()
+        return "\n".join(parts)
+
+    if ext == '.docx':
+        import docx
+        doc = docx.Document(fpath)
+        return "\n".join(p.text for p in doc.paragraphs)
+
+    if ext == '.pptx':
+        from pptx import Presentation
+        prs = Presentation(fpath)
+        parts = []
+        for i, slide in enumerate(prs.slides, 1):
+            texts = []
+            for shape in slide.shapes:
+                if shape.has_text_frame:
+                    texts.append(shape.text_frame.text)
+            if texts:
+                parts.append(f"=== Slide {i} ===")
+                parts.append("\n".join(texts))
+        return "\n".join(parts)
+
+    return ""
+
+
 def exec_tool(name: str, inp: dict) -> str:
     """执行工具，返回结果字符串"""
     try:
@@ -286,14 +327,37 @@ def exec_tool(name: str, inp: dict) -> str:
             )
             output = result.stdout or result.stderr or "无匹配结果"
 
+            # 搜索 Office 文件
+            import re
+            office_matches = []
+            for ext in _OFFICE_EXTS:
+                for fpath in glob_mod.glob(os.path.join(path, "**", f"*{ext}"), recursive=True):
+                    try:
+                        text = _read_office_file(fpath)
+                        rel_path = os.path.relpath(fpath, PROJECT_ROOT)
+                        for line_no, line in enumerate(text.splitlines(), 1):
+                            if re.search(keyword, line, re.IGNORECASE):
+                                office_matches.append(f"{rel_path}:{line_no}: {line}")
+                    except Exception:
+                        continue
+            if office_matches:
+                if output == "无匹配结果":
+                    output = "\n".join(office_matches)
+                else:
+                    output += "\n" + "\n".join(office_matches)
+
         elif name == "read_file":
             fpath = _safe_path(inp["path"])
-            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
-                lines = f.readlines()
-            start = max(1, inp.get("start_line", 1))
-            end = inp.get("end_line", len(lines))
-            selected = lines[start - 1:end]
-            output = "".join(f"{start + i}: {l}" for i, l in enumerate(selected))
+            ext = os.path.splitext(fpath)[1].lower()
+            if ext in _OFFICE_EXTS:
+                output = _read_office_file(fpath) or "(空文件)"
+            else:
+                with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                    lines = f.readlines()
+                start = max(1, inp.get("start_line", 1))
+                end = inp.get("end_line", len(lines))
+                selected = lines[start - 1:end]
+                output = "".join(f"{start + i}: {l}" for i, l in enumerate(selected))
 
         elif name == "write_file":
             fpath = _safe_path(inp["path"])

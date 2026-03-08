@@ -3,3 +3,6 @@ anthropic
 httpx[socks]
 pyyaml
 watchdog
+openpyxl
+python-docx
+python-pptx
