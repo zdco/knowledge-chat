@@ -671,27 +671,30 @@ def _run_openai_stream(messages: list):
             content = ""
             tool_calls_acc = {}  # index -> {id, name, arguments}
 
-            for chunk in stream:
-                choice = chunk.choices[0] if chunk.choices else None
-                if not choice:
-                    continue
-                delta = choice.delta
+            try:
+                for chunk in stream:
+                    choice = chunk.choices[0] if chunk.choices else None
+                    if not choice or not choice.delta:
+                        continue
+                    delta = choice.delta
 
-                if delta.content:
-                    yield {"event": "text_delta", "data": {"delta": delta.content}}
-                    content += delta.content
+                    if delta.content:
+                        yield {"event": "text_delta", "data": {"delta": delta.content}}
+                        content += delta.content
 
-                if delta.tool_calls:
-                    for tc in delta.tool_calls:
-                        idx = tc.index
-                        if idx not in tool_calls_acc:
-                            tool_calls_acc[idx] = {"id": "", "name": "", "arguments": ""}
-                        if tc.id:
-                            tool_calls_acc[idx]["id"] = tc.id
-                        if tc.function and tc.function.name:
-                            tool_calls_acc[idx]["name"] = tc.function.name
-                        if tc.function and tc.function.arguments:
-                            tool_calls_acc[idx]["arguments"] += tc.function.arguments
+                    if delta.tool_calls:
+                        for tc in delta.tool_calls:
+                            idx = tc.index
+                            if idx not in tool_calls_acc:
+                                tool_calls_acc[idx] = {"id": "", "name": "", "arguments": ""}
+                            if tc.id:
+                                tool_calls_acc[idx]["id"] = tc.id
+                            if tc.function and tc.function.name:
+                                tool_calls_acc[idx]["name"] = tc.function.name
+                            if tc.function and tc.function.arguments:
+                                tool_calls_acc[idx]["arguments"] += tc.function.arguments
+            finally:
+                stream.close()
 
             logger.info("API 返回, 第 %d 轮, 工具调用数: %d", iteration + 1, len(tool_calls_acc))
 
@@ -708,7 +711,10 @@ def _run_openai_stream(messages: list):
 
         # 解析参数并检查是否全部为空
         parsed_calls = []
-        for tc in sorted(tool_calls_acc.values(), key=lambda x: x["id"]):
+        for idx, tc in sorted(tool_calls_acc.items()):
+            # 兜底：部分代理不返回 tool call id
+            if not tc["id"]:
+                tc["id"] = f"call_{iteration}_{idx}"
             try:
                 inp = json.loads(tc["arguments"]) if tc["arguments"] else {}
             except json.JSONDecodeError:
