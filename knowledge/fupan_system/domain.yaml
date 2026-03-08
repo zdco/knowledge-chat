@@ -1,0 +1,234 @@
+# knowledge/fupan_system/domain.yaml
+name: "复盘&盯盘系统"
+description: "股票复盘与盯盘系统，包含涨停计算、涨停查询、价格告警、股票池告警、日高低告警、推送分发等服务的完整源码、JCE接口定义、配置和数据库脚本"
+
+data_path: "data"
+
+prompt: |
+  ## 复盘&盯盘系统（fupan_project）
+
+  ### 项目概况
+  - 语言：C++11，框架：TAF（腾讯应用框架）
+  - 构建：CMake 3.15+，版本 1.4.0
+  - 主要依赖：TAF、MySQL、HQLib（行情库）、ISSvrLib（服务库）、JsonCpp、Redis、Rdkafka、DCache、Oracle、ZSTD
+  - 支持 GMSSL 加密、信创系统
+
+  ### 文件结构
+
+  #### data/src/ — 主服务源码，分三大模块
+
+  **FuPan（复盘模块）**：
+  - ZTCalcSvr/ — 涨停计算服务（最核心模块）
+    - ZTCalcServer.h/cpp — TAF Application 主类，初始化日志、定时器、线程池
+    - ZTCalcImp.h/cpp — 服务接口实现，继承 FuPan::ZTCalc，提供 notifyStockZTReason / regZTPush / heartBeat / updateSpecialBlock / getSysMonitorInfo 等接口
+    - StockMng.h/cpp — 股池计算管理，接收 CVT 数据，计算涨停池、跌停池、涨停开板池、强势股、连板数
+    - BlockMng.h/cpp — 板块数据计算，板块基础数据、风口数据、琅琊榜、板块异动
+    - BlockChangeMng.h/cpp — 板块异动计算管理
+    - BlockHandler.h/cpp — 板块数据处理器
+    - MarketData.h/cpp — CVT 数据接收管理，交易日期/时间管理，退市股票管理
+    - MarketTrend.h/cpp — 市场风向计算
+    - GlobalVar.h/cpp — 全局配置（交易时间段、线程间隔、行情队列限制）
+    - HisFactorMng.h/cpp — 历史因子管理
+    - HisFactorModule.h/cpp, HisFactorUnitBase.h/cpp, HisFactorUnits.h/cpp, HisFactorUnits2.h/cpp — 历史因子计算模块和单元
+    - CallAuctionMng.h/cpp — 竞价数据管理
+    - DataConvert.h/cpp — 数据转换
+    - DataUtil.h/cpp — 数据工具
+    - FactorDBOperate.h/cpp — 因子数据库操作
+    - ListBlock.h/cpp — 板块列表
+    - PushMsgMng.h/cpp — 推送消息管理
+    - RegDataMng.h/cpp — 注册数据管理
+    - StockDictMgr.h/cpp — 股票字典管理
+    - StockStrategy.h/cpp — 股票策略
+    - zt_util.h/cpp — 涨停工具函数
+  - ZTQuerySvr/ — 涨停查询服务
+    - ZTQuerySvr.h/cpp — TAF Application 主类
+    - ZTQueryImp.h/cpp — 查询接口实现，继承 FuPan::ZTQuery，提供 getZTPool / getBlockData / getMarketTrend / getCallAuction / getHisFactor 等查询接口
+    - CacheMgr.h/cpp — 缓存管理，从 ZTCalcSvr 拉取数据缓存
+    - FuPanDataMng.h/cpp — 复盘数据管理
+    - FuPanDataImp.h/cpp — 复盘数据接口实现
+    - FuPanHotDataMng.h/cpp — 复盘热点数据管理
+    - DataUtil.h/cpp — 数据工具
+    - XuaInfo.h — 用户信息定义
+
+  **Alarm（告警模块）**：
+  - PriceAlarmServerNew/ — 价格告警服务（最复杂的告警模块）
+    - PriceAlarmServer.h/cpp — TAF Application 主类
+    - PriceAlarmImp.h/cpp — 告警接口实现，提供 addAlarm / delAlarm / modifyAlarm / queryAlarm 等用户告警管理接口
+    - AlarmDefine.h — 告警类型定义和常量
+    - AlarmRule.h/cpp — 告警规则引擎，判断是否触发告警
+    - AlarmConfig.h/cpp — 告警配置管理
+    - AlarmUtils.h/cpp — 告警工具函数
+    - UserAlarmMgr.h/cpp — 用户告警管理
+    - User.h/cpp — 用户模型
+    - StockData.h/cpp — 股票数据
+    - StockMgr.h/cpp — 股票管理
+    - MarketDataMgr.h/cpp — 行情数据管理
+    - IndexDataMgr.h/cpp — 指数数据管理
+    - IndexDataStockPool.h/cpp — 指数数据股票池
+    - OtherDataMgr.h/cpp — 其他数据管理
+    - Formula.h/cpp — 公式计算
+    - CmdMgr.h/cpp — 命令管理
+    - DbManager.h/cpp, DbDefine.h — 数据库操作
+    - PrivilegeMgr.h/cpp — 权限管理
+    - HealthMonitor.h/cpp — 健康监控
+    - StatisticsMgr.h/cpp — 统计管理
+    - Push/ — 推送子模块
+      - PushMgr.h/cpp — 推送管理器
+      - Pusher.h — 推送器接口
+      - HttpPusher.cpp, ThirdPusher.h/cpp — HTTP/第三方推送
+      - TcpPushMgr.h/cpp — TCP 推送
+      - WxPushMgr.h/cpp — 微信推送
+      - Plug.h/cpp — 插件推送
+      - PushTemplateMgr.h/cpp — 推送模板管理
+      - HttpConPoolMgr.h/cpp — HTTP 连接池
+      - DataPusher.cpp — 数据推送
+  - StockPoolAlarmServer/ — 股票池告警服务
+    - StockPoolAlarmServer.h/cpp — 主类
+    - StockPoolAlarmImp.h/cpp — 接口实现
+    - StockPoolMgr.h/cpp — 股票池管理
+    - ReminderMgr.h/cpp — 提醒管理
+    - FactorData.h/cpp, FactorDataMgr.h/cpp — 因子数据
+    - AlarmPeriod.h/cpp — 告警周期
+    - Pusher.h/cpp — 推送
+    - FillPushMsg.h/cpp — 填充推送消息
+    - PushTemplate.h/cpp — 推送模板
+    - DbManager.h/cpp, DbDefine.h — 数据库
+  - DayHighLowServer/ — 日高低告警服务
+    - DayHighLowServer.h/cpp — 主类
+    - DayHighLowImp.h/cpp — 接口实现
+    - TaskManager.h/cpp — 任务管理
+    - DbManager.h/cpp — 数据库
+  - DispatchProxyServerNew/ — 告警分发代理服务
+    - DispatchProxyServer.h/cpp — 主类
+    - DispatchProxyImp.h/cpp — 接口实现，用户告警的增删改查分发
+    - UserManager.h/cpp — 用户管理
+    - ServerPolicy.h/cpp — 服务策略（一致性哈希分配用户到告警服务节点）
+    - DbManager.h/cpp — 数据库
+    - EmailRobot.h/cpp — 邮件机器人
+    - XuaInfo.h — 用户信息
+  - PushCacheServer/ — 推送缓存服务
+    - PushCacheServer.h/cpp — 主类
+    - PushCacheImp.h/cpp — 接口实现，缓存推送消息供客户端拉取
+    - UserMsgMgr.hpp/cpp — 用户消息管理
+    - BroadcastMsg.h/cpp — 广播消息
+  - StatisticsServer/ — 统计服务
+    - StatisticsServer.h/cpp — 主类
+    - StatisticsImp.h/cpp — 接口实现
+    - StatisticsMgr.h/cpp — 统计管理
+    - IpFinder.h/cpp — IP 查找
+  - StockPoolDispatchServer/ — 股票池分发服务
+    - DispatchServer.h/cpp — 主类
+    - DispatchImp.h/cpp — 接口实现
+    - UserMgr.h/cpp — 用户管理
+    - StockPoolAlarmCallback.h/cpp — 告警回调
+    - DbManager.h/cpp — 数据库
+
+  **Monitor（监控模块）** — 各服务的监控版本：
+  - MFactorCalc/ — 因子计算监控
+  - MFactorCalcChangjiang/ — 长江因子计算监控
+  - MIndexZNFactor/ — 指数智能因子监控
+  - MPriceAlarm/ — 价格告警监控
+  - MStockPool/ — 股票池监控
+  - MZTQuery/ — 涨停查询监控
+  - 每个监控服务都包含：EmailRobot（邮件告警）、WechatRobot（企业微信告警）、HttpUtils（HTTP工具）、DataLoader（数据加载）
+
+  #### data/lib/ — 公共库
+  - utils/FuPanUtil.h/cpp — 核心数据结构定义
+    - ZDTDataInfo：涨跌停数据（涨跌停日期、一字涨跌停日期、几天几板、连板天数）
+    - 涨停池/跌停池/开板池等数据结构
+    - 板块数据、市场风向数据结构
+  - utils/SnowFlakeID.h/cpp — 雪花算法 ID 生成器
+  - utils/SysMonitorMng.h/cpp — 系统监控管理（CPU、内存、线程监控）
+  - company/ — 公司定制模块（长江证券等）
+
+  #### data/proto/ — JCE 协议定义（isjce 子模块）
+  - 包含所有 TAF RPC 接口的 JCE 定义文件
+  - 定义了请求/响应结构体、枚举、服务接口
+
+  #### data/doc/ — 文档
+  - conf/ — 各服务配置文件模板
+    - FuPan/ZTCalcSvr/ZTCalcSvr.conf — 涨停计算服务配置（calcDataType 控制计算类型开关、globalvar 全局参数）
+    - FuPan/ZTCalcSvr/cvt.conf — CVT 行情数据源配置
+    - FuPan/ZTCalcSvr/BlockChange.conf — 板块异动配置
+    - FuPan/ZTQuerySvr/ZTQuerySvr.conf — 涨停查询服务配置
+    - Alarm/PriceAlarmServerNew/PriceAlarmServerNew.conf — 价格告警配置
+    - Alarm/PriceAlarmServerNew/cvt.conf, plug.conf — 行情和插件配置
+    - Alarm/StockPoolAlarmServer/ — 股票池告警配置
+    - Alarm/DayHighLowServer/ — 日高低告警配置
+    - Alarm/DispatchProxyServerNew/ — 分发代理配置
+    - Alarm/PushCacheServer/ — 推送缓存配置
+    - Monitor/ — 各监控服务配置
+  - sql/ — 数据库建表脚本
+    - FuPan/FuPan_db.sql — 复盘数据库（涨停池、板块数据、市场风向等表）
+    - FuPan/scistock_db.sql — 股票基础数据库
+    - Alarm/PriceAlarmServerNew/ — 价格告警数据库
+    - Alarm/DayHighLowServer/ — 日高低告警数据库
+    - Alarm/StockPoolAlarmServer/ — 股票池告警数据库
+
+  #### data/example/ — 工具集
+  - FuPanBackupTool/ — 复盘数据备份工具
+  - FuPanCheckTool/ — 复盘数据校验工具
+  - FuPanRepairTool/ — 复盘数据修复工具
+  - ServerCheckTool/ — 服务检查工具（含 Web 界面，Python + C++）
+  - TestIndexData/ — 指数数据测试
+  - TestJceCall/ — JCE 接口调用测试
+  - TestServerRsp/ — 服务响应测试
+  - demo/ — 示例代码
+
+  #### data/cmake/ — 构建配置
+  - Common.cmake — 通用编译配置
+  - ThirdParty.cmake — 第三方库配置
+  - tools.cmake — 构建工具函数
+  - modules/ — FindXxx.cmake 查找脚本（MySQL、Oracle、Redis、Kafka、TAF 等）
+
+  #### data/script/ — 脚本
+  - genversion.sh — 版本号生成
+  - tar.sh — 打包脚本
+  - upload.sh — 上传脚本
+
+  ### 核心概念
+  - 涨停池（ZT Pool）：当日涨停的股票集合，按连板数、一字板等分类
+  - 跌停池（DT Pool）：当日跌停的股票集合
+  - 开板池：涨停后打开的股票
+  - 连板数（ContinueBoard）：连续涨停天数，如"3天3板"
+  - 一字板（OneBoard）：开盘即涨停，全天未打开
+  - 板块异动（BlockChange）：板块内股票集体异动的检测
+  - 琅琊榜：板块排名数据
+  - 风口数据：热门板块/概念数据
+  - 市场风向（MarketTrend）：整体市场情绪指标
+  - 竞价数据（CallAuction）：集合竞价阶段的数据
+  - 历史因子（HisFactor）：历史统计因子，用于量化分析
+  - CVT：行情数据接收组件，提供实时行情推送
+  - TAF：腾讯应用框架，提供 RPC、配置管理、日志等基础设施
+  - JCE：TAF 的接口定义语言，类似 Protobuf/Thrift
+  - 雪花算法 ID：分布式唯一 ID 生成
+
+  ### 服务架构
+  - ZTCalcSvr 接收 CVT 实时行情 → 计算涨停池/板块数据 → 写入数据库 + 推送给 ZTQuerySvr
+  - ZTQuerySvr 缓存 ZTCalcSvr 的计算结果 → 对外提供查询接口
+  - PriceAlarmServerNew 接收行情 → 匹配用户告警规则 → 触发推送（HTTP/TCP/微信/第三方）
+  - DispatchProxyServerNew 作为告警入口 → 一致性哈希分配用户到 PriceAlarmServer 节点
+  - StockPoolAlarmServer 监控股票池变化 → 触发告警推送
+  - PushCacheServer 缓存推送消息 → 客户端拉取
+  - Monitor 各服务定期检查对应业务服务健康状态 → 邮件/企业微信告警
+
+  ### 查询指引
+  - 查 JCE 接口定义（请求参数、返回值、枚举）→ 搜索 data/proto/ 下的 .jce 文件
+  - 查涨停计算逻辑 → 搜索 data/src/FuPan/ZTCalcSvr/ 下的 StockMng / BlockMng / MarketTrend
+  - 查涨停查询接口 → 搜索 data/src/FuPan/ZTQuerySvr/ZTQueryImp.cpp
+  - 查告警规则和触发逻辑 → 搜索 data/src/Alarm/PriceAlarmServerNew/AlarmRule.cpp
+  - 查告警推送流程 → 搜索 data/src/Alarm/PriceAlarmServerNew/Push/ 目录
+  - 查用户告警管理（增删改查）→ 搜索 DispatchProxyImp.cpp 或 PriceAlarmImp.cpp
+  - 查数据库表结构 → 搜索 data/doc/sql/ 下的 .sql 文件
+  - 查服务配置项 → 搜索 data/doc/conf/ 下对应服务的 .conf 文件
+  - 查公共数据结构 → 搜索 data/lib/utils/FuPanUtil.h
+  - 查构建配置和依赖 → 搜索 data/CMakeLists.txt 和 data/cmake/
+  - 查监控告警逻辑 → 搜索 data/src/Monitor/ 下对应服务目录
+  - 查工具使用方法 → 搜索 data/example/ 下对应工具的 README.md
+
+examples:
+  - "ZTCalcSvr 涨停池的计算逻辑是怎样的？连板数怎么算？"
+  - "价格告警的触发规则有哪些？AlarmRule 怎么判断是否触发？"
+  - "DispatchProxyServer 是怎么把用户分配到不同告警节点的？"
+  - "ZTQuerySvr 提供了哪些查询接口？参数是什么？"
+  - "板块异动是怎么检测和计算的？"
