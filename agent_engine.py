@@ -262,7 +262,7 @@ def build_system_prompt() -> str:
         parts.append("")
         parts.append("数据库驱动使用说明：")
         parts.append("- MySQL: 使用 pymysql 库连接")
-        parts.append("- Oracle: 使用 oracledb 库连接（thin 模式，无需 Oracle Client）")
+        parts.append("- Oracle: 使用 oracledb 库连接，直接 oracledb.connect() 即可，无需手动初始化 client")
         parts.append("- 推荐使用 pandas 读取查询结果并格式化输出")
         parts.append("- 查询时注意加 LIMIT/ROWNUM 限制返回行数，避免数据量过大")
 
@@ -546,15 +546,27 @@ def exec_tool(name: str, inp: dict) -> str:
         elif name == "run_python":
             import tempfile
             code = inp["code"]
+            # 如果配置了 Oracle Client 路径，自动注入初始化代码
+            oracle_path = CONFIG["tools"].get("oracle_client_path", "")
+            if oracle_path and "oracledb" in code and "init_oracle_client" not in code:
+                code = (
+                    "import oracledb\n"
+                    f"oracledb.init_oracle_client(lib_dir={oracle_path!r})\n"
+                    + code
+                )
             with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as f:
                 f.write(code)
                 tmp_path = f.name
             try:
                 timeout = CONFIG["tools"].get("python_timeout", 300)
+                env = None
+                if oracle_path:
+                    env = os.environ.copy()
+                    env["LD_LIBRARY_PATH"] = oracle_path + ":" + env.get("LD_LIBRARY_PATH", "")
                 result = subprocess.run(
                     ["python3", tmp_path],
                     capture_output=True, text=True,
-                    timeout=timeout, cwd=PROJECT_ROOT,
+                    timeout=timeout, cwd=PROJECT_ROOT, env=env,
                 )
                 output = (result.stdout + result.stderr).strip() or "(无输出)"
             except subprocess.TimeoutExpired:
