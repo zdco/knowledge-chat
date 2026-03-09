@@ -5,6 +5,10 @@ __pycache__/
 # 知识域数据文件（体积大，不提交）
 knowledge/*/data/
 
+# 知识域配置（含私有信息，不提交；模板除外）
+knowledge/*/domain.yaml
+!knowledge/_template/domain.yaml
+
 # AI 学习笔记（运行时生成，不提交）
 knowledge/*/memory/
 knowledge/_memory/*.md
