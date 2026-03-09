@@ -145,6 +145,9 @@ const sendBtn=document.getElementById('sendBtn');
 let history=[];
 let sending=false;
 
+// 从当前页面路径提取路由前缀，适配 nginx 反代不同路径
+const BASE_PATH=location.pathname.replace(/\/chat$/,'');
+
 // ── 对话历史持久化 ──────────────────────────────
 const STORAGE_KEY='mdschat_sessions_'+location.port+'_'+location.pathname;
 let currentSessionId=null;
@@ -314,7 +317,7 @@ async function sendMessage(){
   let currentToolBlock=null;
 
   try{
-    const resp=await fetch('/kchat/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,history:history.slice(0,-1)})});
+    const resp=await fetch(BASE_PATH+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,history:history.slice(0,-1)})});
     const reader=resp.body.getReader();
     const decoder=new TextDecoder();
     let buffer='';
@@ -396,10 +399,10 @@ async function shareChat(){
   if(welcome)welcome.remove();
   const dom=clone.innerHTML;
   try{
-    const resp=await fetch('/kchat/api/share',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,messages:history,dom})});
+    const resp=await fetch(BASE_PATH+'/api/share',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,messages:history,dom})});
     const data=await resp.json();
     if(!resp.ok){alert(data.error||'分享失败');return}
-    showShareModal(location.origin+data.share_url);
+    showShareModal(location.origin+BASE_PATH+'/share/'+data.share_id);
   }catch(e){alert('分享失败: '+e.message)}
 }
 function showShareModal(url){
