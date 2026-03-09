@@ -346,6 +346,11 @@ async function sendMessage(){
           }else if(eventType==='tool_result'){
             if(currentToolBlock)setToolResult(currentToolBlock,data.output||'');
             currentToolBlock=null;
+          }else if(eventType==='thinking'){
+            if(!thinkingEl.parentNode){
+              chatBox.appendChild(thinkingEl);
+              scrollBottom();
+            }
           }else if(eventType==='text_delta'){
             if(thinkingEl.parentNode)thinkingEl.remove();
             const delta=data.delta||'';

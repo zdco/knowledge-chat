@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 所有路由统一添加 `/kchat` 前缀，便于 nginx 反向代理一条规则转发
 - config.yaml 新增 `oracle_client_path` 配置项，支持设为 `auto` 自动下载安装 Oracle Instant Client，run_python 执行时自动注入 thick 模式初始化和 LD_LIBRARY_PATH
 - AI_GUIDE.md 新增数据库知识域 prompt 编写规则：禁止猜测表名字段名、连接代码无需手动初始化 client、提供元数据查询模板
+- 工具执行完进入下一轮 AI 思考时，前端重新显示"思考中..."提示，避免用户以为卡住
 
 ### Fixed
 - start.sh 移除强制环境变量检查，支持仅通过 config.yaml 配置 API 密钥启动

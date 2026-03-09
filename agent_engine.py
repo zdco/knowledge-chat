@@ -734,6 +734,7 @@ def _run_anthropic_stream(messages: list):
             })
 
         messages.append({"role": "user", "content": tool_results})
+        yield {"event": "thinking", "data": {}}
 
     logger.warning("达到最大迭代次数 %d", MAX_ITERATIONS)
     yield {"event": "error", "data": {"message": "达到最大迭代次数"}}
@@ -849,6 +850,8 @@ def _run_openai_stream(messages: list):
             oai_messages.append({
                 "role": "tool", "tool_call_id": tc["id"], "content": result,
             })
+
+        yield {"event": "thinking", "data": {}}
 
     logger.warning("达到最大迭代次数 %d", MAX_ITERATIONS)
     yield {"event": "error", "data": {"message": "达到最大迭代次数"}}
