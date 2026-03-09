@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - bash 工具执行外部 Python 脚本时注入 `.venv/bin` 到 PATH，解决找不到虚拟环境依赖包的问题
+- 同一 IP 部署多个服务时历史会话列表混在一起，localStorage key 加入端口号和路径区分
 
 ## [0.3.1] - 2026-03-09
 

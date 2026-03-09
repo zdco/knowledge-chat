@@ -146,7 +146,7 @@ let history=[];
 let sending=false;
 
 // ── 对话历史持久化 ──────────────────────────────
-const STORAGE_KEY='mdschat_sessions';
+const STORAGE_KEY='mdschat_sessions_'+location.port+'_'+location.pathname;
 let currentSessionId=null;
 
 function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
