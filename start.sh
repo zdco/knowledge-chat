@@ -14,7 +14,8 @@ fi
 
 # 创建虚拟环境并安装依赖
 VENV_DIR=".venv"
-if [ ! -d "$VENV_DIR" ]; then
+if [ ! -f "$VENV_DIR/bin/activate" ]; then
+    rm -rf "$VENV_DIR"
     # 检查 python3-venv 是否可用，不可用则自动安装
     if ! python3 -m venv --help &>/dev/null; then
         echo "检测到缺少 python3-venv，正在自动安装..."
