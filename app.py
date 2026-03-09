@@ -49,6 +49,8 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 start_watcher()
 
+SITE_TITLE = CONFIG.get("server", {}).get("title", "全能 AI 助手")
+
 SHARES_DIR = os.path.join(os.path.dirname(__file__), "shares")
 os.makedirs(SHARES_DIR, exist_ok=True)
 
@@ -66,7 +68,7 @@ def _get_examples() -> list[dict]:
 
 @app.route("/kchat/chat")
 def chat_page():
-    return render_template("chat.html", example_groups=_get_examples())
+    return render_template("chat.html", example_groups=_get_examples(), title=SITE_TITLE)
 
 
 @app.route("/kchat/api/chat", methods=["POST"])
@@ -145,7 +147,7 @@ def share_page(share_id):
     with open(share_path, "r", encoding="utf-8") as f:
         share = json.load(f)
 
-    return render_template("share.html", share=share)
+    return render_template("share.html", share=share, title=SITE_TITLE)
 
 
 if __name__ == "__main__":

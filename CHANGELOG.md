@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- config.yaml `server` 段新增 `title` 字段，网页标题可通过配置文件修改，不再硬编码
+
+### Fixed
+- bash 工具执行外部 Python 脚本时注入 `.venv/bin` 到 PATH，解决找不到虚拟环境依赖包的问题
+
 ## [0.3.1] - 2026-03-09
 
 ### Added

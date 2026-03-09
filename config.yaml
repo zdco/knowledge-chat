@@ -26,6 +26,7 @@ api:
 server:
   host: "0.0.0.0"
   port: 5001
+  title: "全能 AI 助手"
 
 # 工具配置
 tools:
@@ -38,7 +39,7 @@ tools:
   # Oracle Instant Client 路径，连接旧版 Oracle 需要 thick 模式时配置
   # 设为 "auto" 可在首次启动时自动下载安装到项目目录下
   # 也可填写已有的绝对路径，如 "/data/user/chaolv/oracle/instantclient_19_24"
-  # oracle_client_path: "auto"
+  oracle_client_path: "auto"
 
 # 日志配置
 logging:

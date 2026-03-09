@@ -594,9 +594,13 @@ def exec_tool(name: str, inp: dict) -> str:
             output = "\n".join(rel) if rel else "无匹配文件"
 
         elif name == "bash":
+            bash_env = os.environ.copy()
+            venv_bin = os.path.join(PROJECT_ROOT, ".venv", "bin")
+            if os.path.isdir(venv_bin):
+                bash_env["PATH"] = venv_bin + ":" + bash_env.get("PATH", "")
             result = subprocess.run(
                 inp["command"], shell=True, capture_output=True, text=True,
-                timeout=30, cwd=PROJECT_ROOT,
+                timeout=30, cwd=PROJECT_ROOT, env=bash_env,
             )
             output = (result.stdout + result.stderr).strip() or "(无输出)"
 
