@@ -314,7 +314,7 @@ async function sendMessage(){
   let currentToolBlock=null;
 
   try{
-    const resp=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,history:history.slice(0,-1)})});
+    const resp=await fetch('/kchat/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,history:history.slice(0,-1)})});
     const reader=resp.body.getReader();
     const decoder=new TextDecoder();
     let buffer='';
@@ -391,7 +391,7 @@ async function shareChat(){
   if(welcome)welcome.remove();
   const dom=clone.innerHTML;
   try{
-    const resp=await fetch('/api/share',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,messages:history,dom})});
+    const resp=await fetch('/kchat/api/share',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,messages:history,dom})});
     const data=await resp.json();
     if(!resp.ok){alert(data.error||'分享失败');return}
     showShareModal(location.origin+data.share_url);

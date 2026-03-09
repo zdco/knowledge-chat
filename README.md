@@ -37,7 +37,7 @@ export AI_CHAT_API_KEY="your-token"
 python app.py
 ```
 
-打开 http://localhost:5001/chat
+打开 http://localhost:5001/kchat/chat
 
 ### Docker 运行
 

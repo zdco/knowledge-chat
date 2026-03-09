@@ -64,12 +64,12 @@ def _get_examples() -> list[dict]:
     return groups
 
 
-@app.route("/chat")
+@app.route("/kchat/chat")
 def chat_page():
     return render_template("chat.html", example_groups=_get_examples())
 
 
-@app.route("/api/chat", methods=["POST"])
+@app.route("/kchat/api/chat", methods=["POST"])
 def chat_api():
     data = request.get_json()
     user_message = data.get("message", "").strip()
@@ -96,14 +96,14 @@ def chat_api():
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
-@app.route("/wiki/<domain>/<path:filepath>")
+@app.route("/kchat/wiki/<domain>/<path:filepath>")
 def serve_wiki_file(domain, filepath):
     """提供 wiki 图片等静态文件访问"""
     wiki_dir = os.path.join(os.path.dirname(__file__), "knowledge", domain, "data", "wiki")
     return send_from_directory(wiki_dir, filepath)
 
 
-@app.route("/api/share", methods=["POST"])
+@app.route("/kchat/api/share", methods=["POST"])
 def share_api():
     """创建分享链接"""
     data = request.get_json()
@@ -129,10 +129,10 @@ def share_api():
         with open(share_path, "w", encoding="utf-8") as f:
             json.dump(share_data, f, ensure_ascii=False, indent=2)
 
-    return {"share_id": share_id, "share_url": f"/share/{share_id}"}
+    return {"share_id": share_id, "share_url": f"/kchat/share/{share_id}"}
 
 
-@app.route("/share/<share_id>")
+@app.route("/kchat/share/<share_id>")
 def share_page(share_id):
     """查看分享的对话"""
     if not share_id.isalnum() or len(share_id) != 8:
@@ -156,14 +156,14 @@ if __name__ == "__main__":
     print(f"模型: {MODEL}")
     print(f"地址: {BASE_URL}")
     print(f"格式: {API_FORMAT}")
-    print(f"访问: http://localhost:{port}/chat")
+    print(f"访问: http://localhost:{port}/kchat/chat")
     if host == "0.0.0.0":
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.connect(("8.8.8.8", 80))
             local_ip = s.getsockname()[0]
             s.close()
-            print(f"局域网: http://{local_ip}:{port}/chat")
+            print(f"局域网: http://{local_ip}:{port}/kchat/chat")
         except Exception:
             pass
     app.run(host=host, port=port, threaded=True)
