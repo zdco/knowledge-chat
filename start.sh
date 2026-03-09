@@ -22,5 +22,11 @@ source "$VENV_DIR/bin/activate"
 
 pip install -q -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-echo "启动全能 AI 助手..."
-python app.py
+if [ "$1" = "-d" ]; then
+    echo "后台启动全能 AI 助手..."
+    nohup python app.py > output.log 2>&1 &
+    echo "PID: $!, 日志: output.log"
+else
+    echo "启动全能 AI 助手..."
+    python app.py
+fi

@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - 启动时显示局域网访问地址，方便从其他设备访问或复制链接
+- start.sh 支持 `-d` 参数后台运行，日志输出到 output.log
 
 ### Fixed
 - start.sh 移除强制环境变量检查，支持仅通过 config.yaml 配置 API 密钥启动

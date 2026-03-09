@@ -19,8 +19,8 @@
 ### 使用启动脚本（推荐）
 
 ```bash
-export AI_CHAT_API_KEY="your-token"
-bash start.sh
+./start.sh      # 前台运行
+./start.sh -d   # 后台运行（日志输出到 output.log）
 ```
 
 `start.sh` 会自动创建虚拟环境、安装依赖并启动服务。
