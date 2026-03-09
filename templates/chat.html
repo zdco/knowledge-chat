@@ -423,11 +423,19 @@ function showShareModal(url){
 }
 function copyShareLink(){
   const input=document.getElementById('shareLinkInput');
-  navigator.clipboard.writeText(input.value).then(()=>{
-    const btn=input.nextElementSibling;
+  const btn=input.nextElementSibling;
+  if(navigator.clipboard&&window.isSecureContext){
+    navigator.clipboard.writeText(input.value).then(()=>{
+      btn.textContent='已复制';
+      setTimeout(()=>{btn.textContent='复制'},2000);
+    });
+  }else{
+    input.select();
+    input.setSelectionRange(0,99999);
+    document.execCommand('copy');
     btn.textContent='已复制';
     setTimeout(()=>{btn.textContent='复制'},2000);
-  }).catch(()=>{input.select();document.execCommand('copy')});
+  }
 }
 
 userInput.addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'});
