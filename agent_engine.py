@@ -78,18 +78,19 @@ def _ensure_oracle_client() -> str:
     os.makedirs(install_dir, exist_ok=True)
     zip_path = os.path.join(install_dir, "instantclient.zip")
     log = logging.getLogger(__name__)
-    log.info("正在下载 Oracle Instant Client...")
     try:
-        def _progress(block_num, block_size, total_size):
-            downloaded = block_num * block_size
-            if total_size > 0:
-                pct = min(100, downloaded * 100 // total_size)
-                mb_done = downloaded / 1024 / 1024
-                mb_total = total_size / 1024 / 1024
-                print(f"\r下载 Oracle Instant Client: {mb_done:.1f}/{mb_total:.1f} MB ({pct}%)", end="", flush=True)
-        urllib.request.urlretrieve(url, zip_path, reporthook=_progress)
-        print()  # 换行
-        log.info("下载完成，正在解压...")
+        if not os.path.isfile(zip_path):
+            log.info("正在下载 Oracle Instant Client...")
+            def _progress(block_num, block_size, total_size):
+                downloaded = block_num * block_size
+                if total_size > 0:
+                    pct = min(100, downloaded * 100 // total_size)
+                    mb_done = downloaded / 1024 / 1024
+                    mb_total = total_size / 1024 / 1024
+                    print(f"\r下载 Oracle Instant Client: {mb_done:.1f}/{mb_total:.1f} MB ({pct}%)", end="", flush=True)
+            urllib.request.urlretrieve(url, zip_path, reporthook=_progress)
+            print()  # 换行
+        log.info("正在解压 Oracle Instant Client...")
         with zipfile.ZipFile(zip_path, "r") as zf:
             zf.extractall(install_dir)
         os.remove(zip_path)
