@@ -149,6 +149,7 @@ def share_page(share_id):
 
 
 if __name__ == "__main__":
+    import socket
     server_cfg = CONFIG.get("server", {})
     host = server_cfg.get("host", "0.0.0.0")
     port = server_cfg.get("port", 5001)
@@ -156,4 +157,13 @@ if __name__ == "__main__":
     print(f"地址: {BASE_URL}")
     print(f"格式: {API_FORMAT}")
     print(f"访问: http://localhost:{port}/chat")
+    if host == "0.0.0.0":
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+            print(f"局域网: http://{local_ip}:{port}/chat")
+        except Exception:
+            pass
     app.run(host=host, port=port, threaded=True)
