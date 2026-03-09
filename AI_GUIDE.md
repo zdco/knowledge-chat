@@ -376,6 +376,23 @@ examples:
 
 将收集到的信息写入 domain.yaml 的 `databases` 字段。
 
+### prompt 中数据库相关规则
+
+在 prompt 中编写数据库查询指引时，必须遵循以下规则：
+
+1. **连接代码不要写 `init_oracle_client`**，系统会自动注入 thick 模式初始化，prompt 中只需写：
+   ```python
+   import oracledb
+   conn = oracledb.connect(user="xxx", password="xxx", dsn="host:port/service")
+   ```
+
+2. **必须强调"禁止猜测表名和字段名"**，要求 AI 先通过以下方式确认：
+   - 搜索 data/ 下的文档（如果有导出的元数据文件）
+   - 查询数据库的元数据表（如 Oracle 的 `ALL_TABLES`、`ALL_TAB_COLUMNS`，MySQL 的 `information_schema`）
+   - 确认表名和字段名后再写业务查询
+
+3. **提供元数据查询模板**，在 prompt 的"查询指引"中给出具体的元数据查询 SQL，降低 AI 猜测的概率
+
 ## 完整示例
 
 用户说："帮我用 /home/dev/hqjce 和 /home/dev/MarketDataServer 还有 /home/dev/doc 创建一个行情接口的知识域"
