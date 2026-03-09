@@ -10,7 +10,7 @@ from logging.handlers import TimedRotatingFileHandler
 from flask import Flask, render_template, request, Response, send_from_directory
 
 from agent_engine import run_agent_stream, CONFIG, KNOWLEDGE_DOMAINS, start_watcher, request_id_var, \
-    BASE_URL, MODEL, API_FORMAT
+    BASE_URL, MODEL, API_FORMAT, ORACLE_CLIENT_PATH
 
 # ── 日志初始化 ────────────────────────────────────────────
 _log_cfg = CONFIG.get("logging", {})
@@ -156,6 +156,7 @@ if __name__ == "__main__":
     print(f"模型: {MODEL}")
     print(f"地址: {BASE_URL}")
     print(f"格式: {API_FORMAT}")
+    print(f"Oracle: {ORACLE_CLIENT_PATH or '未配置'}")
     print(f"访问: http://localhost:{port}/kchat/chat")
     if host == "0.0.0.0":
         try:
