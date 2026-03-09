@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- 优化 README.md：修正过时路径和配置示例，新增手动安装说明、功能特性段落、API 格式说明，补全项目结构
+
 ## [0.3.0] - 2026-03-08
 
 ### Added
