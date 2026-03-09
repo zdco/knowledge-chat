@@ -5,10 +5,10 @@ set -e
 cd "$(dirname "$0")"
 
 # 检查环境变量
-if [ -z "$ANTHROPIC_AUTH_TOKEN" ]; then
+if [ -z "$AI_CHAT_API_KEY" ]; then
     echo "请先设置环境变量："
-    echo '  export ANTHROPIC_BASE_URL="http://coding.whup.com/"'
-    echo '  export ANTHROPIC_AUTH_TOKEN="your-token"'
+    echo '  export AI_CHAT_BASE_URL="http://coding.whup.com/"'
+    echo '  export AI_CHAT_API_KEY="your-token"'
     exit 1
 fi
 

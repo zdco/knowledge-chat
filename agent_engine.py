@@ -30,9 +30,9 @@ def _load_config() -> dict:
 
 CONFIG = _load_config()
 
-BASE_URL = os.environ.get("ANTHROPIC_BASE_URL", CONFIG["api"]["base_url"])
-API_KEY = os.environ.get("ANTHROPIC_AUTH_TOKEN", CONFIG["api"]["api_key"])
-MODEL = os.environ.get("ANTHROPIC_MODEL", CONFIG["api"]["model"])
+BASE_URL = os.environ.get("AI_CHAT_BASE_URL", CONFIG["api"]["base_url"])
+API_KEY = os.environ.get("AI_CHAT_API_KEY", CONFIG["api"]["api_key"])
+MODEL = os.environ.get("AI_CHAT_MODEL", CONFIG["api"]["model"])
 MAX_TOKENS = CONFIG["api"]["max_tokens"]
 MAX_ITERATIONS = CONFIG["api"]["max_iterations"]
 MAX_OUTPUT_LEN = CONFIG["tools"]["max_output_length"]

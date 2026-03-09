@@ -19,7 +19,7 @@
 ### 使用启动脚本（推荐）
 
 ```bash
-export ANTHROPIC_AUTH_TOKEN="your-token"
+export AI_CHAT_API_KEY="your-token"
 bash start.sh
 ```
 
@@ -33,7 +33,7 @@ bash start.sh
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-export ANTHROPIC_AUTH_TOKEN="your-token"
+export AI_CHAT_API_KEY="your-token"
 python app.py
 ```
 
@@ -49,9 +49,9 @@ docker-compose up -d
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `ANTHROPIC_AUTH_TOKEN` | API 密钥（必填） | — |
-| `ANTHROPIC_BASE_URL` | API 代理地址 | `http://coding.whup.com/` |
-| `ANTHROPIC_MODEL` | 模型名称（覆盖 config.yaml） | — |
+| `AI_CHAT_API_KEY` | API 密钥（必填） | — |
+| `AI_CHAT_BASE_URL` | API 代理地址 | `http://coding.whup.com/` |
+| `AI_CHAT_MODEL` | 模型名称（覆盖 config.yaml） | — |
 
 ## 配置
 
@@ -61,7 +61,7 @@ docker-compose up -d
 api:
   # 代理地址（含 /v1 自动走 OpenAI 格式，否则走 Anthropic 格式）
   base_url: "http://coding.whup.com/v1"
-  api_key: ""                            # 密钥（环境变量 ANTHROPIC_AUTH_TOKEN 优先）
+  api_key: ""                            # 密钥（环境变量 AI_CHAT_API_KEY 优先）
   model: "MiniMax-M2.5"                  # 模型名称
   max_tokens: 4096                       # 单次回复最大 token
   max_iterations: 50                     # Agent 最大工具调用轮数
@@ -89,7 +89,7 @@ logging:
 编辑 `config.yaml` 中的 `api.model`，或通过环境变量覆盖：
 
 ```bash
-export ANTHROPIC_MODEL="claude-haiku-4-5-20251001"
+export AI_CHAT_MODEL="claude-haiku-4-5-20251001"
 ```
 
 | 模型 | 说明 |

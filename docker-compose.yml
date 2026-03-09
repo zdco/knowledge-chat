@@ -6,8 +6,8 @@ services:
     ports:
       - "5001:5001"
     environment:
-      - ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN}
-      - ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL:-http://coding.whup.com/}
+      - AI_CHAT_API_KEY=${AI_CHAT_API_KEY}
+      - AI_CHAT_BASE_URL=${AI_CHAT_BASE_URL:-http://coding.whup.com/}
     volumes:
       # 挂载知识域目录，方便外部添加知识域无需重新构建镜像
       - ./knowledge:/app/knowledge

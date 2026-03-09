@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - start.sh 检测不完整的 .venv 目录（缺少 activate）时自动重建，避免上次创建失败后卡住
 
 ### Changed
+- 环境变量重命名：`ANTHROPIC_AUTH_TOKEN` → `AI_CHAT_API_KEY`、`ANTHROPIC_BASE_URL` → `AI_CHAT_BASE_URL`、`ANTHROPIC_MODEL` → `AI_CHAT_MODEL`，避免与 Claude Code 等工具的环境变量冲突
 - 优化 README.md：修正过时路径和配置示例，新增手动安装说明、功能特性段落、API 格式说明，补全项目结构
 
 ## [0.3.0] - 2026-03-08
