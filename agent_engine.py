@@ -47,6 +47,57 @@ else:
 
 PROJECT_ROOT = os.path.abspath(_DIR)
 
+
+# ── Oracle Client 自动安装 ────────────────────────────────
+
+def _ensure_oracle_client() -> str:
+    """根据配置返回 Oracle Client 路径，配置为 auto 时自动下载安装。返回空字符串表示不启用。"""
+    cfg = CONFIG["tools"].get("oracle_client_path", "")
+    if not cfg:
+        return ""
+    if cfg != "auto":
+        return cfg
+    # auto 模式：自动下载到项目目录下
+    install_dir = os.path.join(PROJECT_ROOT, "oracle_client")
+    # 查找已有的 instantclient 目录
+    for name in os.listdir(install_dir) if os.path.isdir(install_dir) else []:
+        candidate = os.path.join(install_dir, name)
+        if name.startswith("instantclient") and os.path.isdir(candidate):
+            return candidate
+    # 下载安装
+    import platform
+    import zipfile
+    arch = platform.machine()
+    if arch == "x86_64":
+        url = "https://download.oracle.com/otn_software/linux/instantclient/1924000/instantclient-basic-linux.x64-19.24.0.0.0dbru.zip"
+    elif arch == "aarch64":
+        url = "https://download.oracle.com/otn_software/linux/instantclient/1924000/instantclient-basic-linux.arm64-19.24.0.0.0dbru.zip"
+    else:
+        logging.getLogger(__name__).warning("不支持的架构 %s，跳过 Oracle Client 自动安装", arch)
+        return ""
+    os.makedirs(install_dir, exist_ok=True)
+    zip_path = os.path.join(install_dir, "instantclient.zip")
+    logging.getLogger(__name__).info("正在下载 Oracle Instant Client...")
+    try:
+        urllib.request.urlretrieve(url, zip_path)
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            zf.extractall(install_dir)
+        os.remove(zip_path)
+    except Exception as e:
+        logging.getLogger(__name__).error("Oracle Client 下载失败: %s", e)
+        return ""
+    # 查找解压后的目录
+    for name in os.listdir(install_dir):
+        candidate = os.path.join(install_dir, name)
+        if name.startswith("instantclient") and os.path.isdir(candidate):
+            logging.getLogger(__name__).info("Oracle Instant Client 已安装: %s", candidate)
+            return candidate
+    return ""
+
+
+ORACLE_CLIENT_PATH = _ensure_oracle_client()
+
+
 # ── 知识域加载 ────────────────────────────────────────────
 
 _KNOWLEDGE_DIR = os.path.join(_DIR, "knowledge")
@@ -547,11 +598,10 @@ def exec_tool(name: str, inp: dict) -> str:
             import tempfile
             code = inp["code"]
             # 如果配置了 Oracle Client 路径，自动注入初始化代码
-            oracle_path = CONFIG["tools"].get("oracle_client_path", "")
-            if oracle_path and "oracledb" in code and "init_oracle_client" not in code:
+            if ORACLE_CLIENT_PATH and "oracledb" in code and "init_oracle_client" not in code:
                 code = (
                     "import oracledb\n"
-                    f"oracledb.init_oracle_client(lib_dir={oracle_path!r})\n"
+                    f"oracledb.init_oracle_client(lib_dir={ORACLE_CLIENT_PATH!r})\n"
                     + code
                 )
             with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as f:
@@ -560,9 +610,9 @@ def exec_tool(name: str, inp: dict) -> str:
             try:
                 timeout = CONFIG["tools"].get("python_timeout", 300)
                 env = None
-                if oracle_path:
+                if ORACLE_CLIENT_PATH:
                     env = os.environ.copy()
-                    env["LD_LIBRARY_PATH"] = oracle_path + ":" + env.get("LD_LIBRARY_PATH", "")
+                    env["LD_LIBRARY_PATH"] = ORACLE_CLIENT_PATH + ":" + env.get("LD_LIBRARY_PATH", "")
                 result = subprocess.run(
                     ["python3", tmp_path],
                     capture_output=True, text=True,

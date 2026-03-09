@@ -35,8 +35,10 @@ tools:
   max_display_length: 2000
   # run_python 工具超时时间（秒）
   python_timeout: 300
-  # Oracle Instant Client 路径（需要 thick 模式连接旧版 Oracle 时配置）
-  # oracle_client_path: "/home/lvchao/oracle/instantclient_19_24"
+  # Oracle Instant Client 路径，连接旧版 Oracle 需要 thick 模式时配置
+  # 设为 "auto" 可在首次启动时自动下载安装到项目目录下
+  # 也可填写已有的绝对路径，如 "/data/user/chaolv/oracle/instantclient_19_24"
+  # oracle_client_path: "auto"
 
 # 日志配置
 logging:

@@ -22,3 +22,6 @@ shares/
 
 # Confluence 导出 zip 包（体积大，不提交）
 knowledge/*/*.zip
+
+# Oracle Instant Client（自动下载，不提交）
+oracle_client/
