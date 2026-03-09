@@ -15,6 +15,12 @@ fi
 # 创建虚拟环境并安装依赖
 VENV_DIR=".venv"
 if [ ! -d "$VENV_DIR" ]; then
+    # 检查 python3-venv 是否可用，不可用则自动安装
+    if ! python3 -m venv --help &>/dev/null; then
+        echo "检测到缺少 python3-venv，正在自动安装..."
+        PY_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+        sudo apt-get update -qq && sudo apt-get install -y -qq "python${PY_VERSION}-venv"
+    fi
     echo "创建虚拟环境..."
     python3 -m venv "$VENV_DIR"
 fi
