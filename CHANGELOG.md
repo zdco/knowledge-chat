@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 启动时显示局域网访问地址，方便从其他设备访问或复制链接
 
 ### Fixed
+- start.sh 移除强制环境变量检查，支持仅通过 config.yaml 配置 API 密钥启动
 - start.sh 自动检测并安装缺失的 python3-venv 系统包（通过检测 ensurepip 模块），无需用户手动处理
 - start.sh 检测不完整的 .venv 目录（缺少 activate）时自动重建，避免上次创建失败后卡住
 

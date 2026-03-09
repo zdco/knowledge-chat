@@ -4,14 +4,6 @@ set -e
 
 cd "$(dirname "$0")"
 
-# 检查环境变量
-if [ -z "$AI_CHAT_API_KEY" ]; then
-    echo "请先设置环境变量："
-    echo '  export AI_CHAT_BASE_URL="http://coding.whup.com/"'
-    echo '  export AI_CHAT_API_KEY="your-token"'
-    exit 1
-fi
-
 # 创建虚拟环境并安装依赖
 VENV_DIR=".venv"
 if [ ! -f "$VENV_DIR/bin/activate" ]; then
