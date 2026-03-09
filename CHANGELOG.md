@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
-- start.sh 自动检测并安装缺失的 python3-venv 系统包，无需用户手动处理
+- start.sh 自动检测并安装缺失的 python3-venv 系统包（通过检测 ensurepip 模块），无需用户手动处理
 - start.sh 检测不完整的 .venv 目录（缺少 activate）时自动重建，避免上次创建失败后卡住
 
 ### Changed

@@ -16,8 +16,8 @@ fi
 VENV_DIR=".venv"
 if [ ! -f "$VENV_DIR/bin/activate" ]; then
     rm -rf "$VENV_DIR"
-    # 检查 python3-venv 是否可用，不可用则自动安装
-    if ! python3 -m venv --help &>/dev/null; then
+    # 检查 ensurepip 是否可用（venv 创建依赖它），不可用则自动安装
+    if ! python3 -c "import ensurepip" &>/dev/null; then
         echo "检测到缺少 python3-venv，正在自动安装..."
         PY_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
         sudo apt-get update -qq && sudo apt-get install -y -qq "python${PY_VERSION}-venv"
