@@ -657,9 +657,14 @@ def _build_text_cache(data_dir: str) -> None:
 
     # 增量更新：新增或 mtime 变化的文件
     updated = False
-    for rel, mtime in current_files.items():
-        if rel not in meta or meta[rel] != mtime:
+    need_update = [(rel, mtime) for rel, mtime in current_files.items()
+                   if rel not in meta or meta[rel] != mtime]
+    if need_update:
+        total = len(need_update)
+        logger.info("文本缓存：需更新 %d 个文件 (%s)", total, data_dir)
+        for i, (rel, mtime) in enumerate(need_update, 1):
             src_path = os.path.join(data_dir, rel)
+            logger.info("文本缓存 [%d/%d]: %s", i, total, rel)
             _update_single_cache(data_dir, src_path)
             meta[rel] = mtime
             updated = True
