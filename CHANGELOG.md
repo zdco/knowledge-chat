@@ -12,6 +12,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 工具安全加固：system prompt 中数据库密码改为掩码显示，AI 无法向用户透露密码
 - 工具安全加固：run_python 执行时自动注入数据库密码为环境变量，代码通过 os.environ 获取
 - 工具安全加固：system prompt 追加安全规则，从源头约束 AI 不执行破坏性操作、不泄露敏感信息
+- 工具安全加固：bash 增加 base64 解码执行、eval 等绕过手法检测
+- 工具安全加固：run_python 增加危险代码检查（os.system、subprocess、shutil.rmtree 等），禁止执行系统命令
+- 工具安全加固：所有工具输出统一脱敏，自动替换数据库密码和 API Key 为掩码
 
 ### Fixed
 - bash 工具执行外部 Python 脚本时注入 `.venv/bin` 到 PATH，解决找不到虚拟环境依赖包的问题

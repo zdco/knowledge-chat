@@ -517,6 +517,22 @@ _DANGEROUS_PATTERNS = [
     (re.compile(r'(curl|wget)\s.*\|\s*(ba)?sh', re.IGNORECASE), '禁止远程代码执行'),
     (re.compile(r'curl\s.*-d\s+@', re.IGNORECASE), '禁止通过 curl 外泄数据'),
     (re.compile(r'curl\s.*--data\s+@', re.IGNORECASE), '禁止通过 curl 外泄数据'),
+    (re.compile(r'base64\s.*\|\s*(ba)?sh', re.IGNORECASE), '禁止 base64 解码执行'),
+    (re.compile(r'\beval\b', re.IGNORECASE), '禁止 eval 执行'),
+    (re.compile(r'\$\(.*\)\s*\|\s*(ba)?sh', re.IGNORECASE), '禁止命令替换执行'),
+]
+
+# run_python 危险代码模式
+_DANGEROUS_PYTHON_PATTERNS = [
+    (re.compile(r'\bos\.system\b'), '禁止 os.system 调用'),
+    (re.compile(r'\bos\.popen\b'), '禁止 os.popen 调用'),
+    (re.compile(r'\bos\.exec'), '禁止 os.exec* 调用'),
+    (re.compile(r'\bos\.remove\b'), '禁止 os.remove 调用'),
+    (re.compile(r'\bos\.unlink\b'), '禁止 os.unlink 调用'),
+    (re.compile(r'\bos\.rmdir\b'), '禁止 os.rmdir 调用'),
+    (re.compile(r'\bshutil\.rmtree\b'), '禁止 shutil.rmtree 调用'),
+    (re.compile(r'\bsubprocess\b'), '禁止 subprocess 调用'),
+    (re.compile(r'\b__import__\b'), '禁止动态导入'),
 ]
 
 
@@ -528,6 +544,26 @@ def _check_dangerous_command(cmd: str) -> str | None:
         if pattern.search(normalized):
             return reason
     return None
+
+
+def _check_dangerous_python(code: str) -> str | None:
+    """检查 Python 代码是否包含危险模式，返回拒绝原因或 None"""
+    for pattern, reason in _DANGEROUS_PYTHON_PATTERNS:
+        if pattern.search(code):
+            return reason
+    return None
+
+
+def _sanitize_output(text: str) -> str:
+    """将工具输出中的敏感信息替换为掩码"""
+    # 替换数据库密码
+    for env_key, env_val in _DB_PASSWORDS.items():
+        if env_val and env_val in text:
+            text = text.replace(env_val, '***')
+    # 替换 API Key
+    if API_KEY and API_KEY in text:
+        text = text.replace(API_KEY, '***')
+    return text
 
 
 # 工具必填参数映射
@@ -667,34 +703,39 @@ def exec_tool(name: str, inp: dict) -> str:
         elif name == "run_python":
             import tempfile
             code = inp["code"]
-            # 如果配置了 Oracle Client 路径，自动注入初始化代码
-            if ORACLE_CLIENT_PATH and "oracledb" in code and "init_oracle_client" not in code:
-                code = (
-                    "import oracledb\n"
-                    f"oracledb.init_oracle_client(lib_dir={ORACLE_CLIENT_PATH!r})\n"
-                    + code
-                )
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as f:
-                f.write(code)
-                tmp_path = f.name
-            try:
-                timeout = CONFIG["tools"].get("python_timeout", 300)
-                env = os.environ.copy()
-                if ORACLE_CLIENT_PATH:
-                    env["LD_LIBRARY_PATH"] = ORACLE_CLIENT_PATH + ":" + env.get("LD_LIBRARY_PATH", "")
-                # 注入数据库密码为环境变量
-                for env_key, env_val in _DB_PASSWORDS.items():
-                    env[env_key] = env_val
-                result = subprocess.run(
-                    ["python3", tmp_path],
-                    capture_output=True, text=True,
-                    timeout=timeout, cwd=PROJECT_ROOT, env=env,
-                )
-                output = (result.stdout + result.stderr).strip() or "(无输出)"
-            except subprocess.TimeoutExpired:
-                output = f"执行超时（{timeout}秒），代码已终止"
-            finally:
-                os.unlink(tmp_path)
+            # 安全检查
+            danger = _check_dangerous_python(code)
+            if danger:
+                output = f"安全拦截：{danger}，该代码已被禁止执行"
+            else:
+                # 如果配置了 Oracle Client 路径，自动注入初始化代码
+                if ORACLE_CLIENT_PATH and "oracledb" in code and "init_oracle_client" not in code:
+                    code = (
+                        "import oracledb\n"
+                        f"oracledb.init_oracle_client(lib_dir={ORACLE_CLIENT_PATH!r})\n"
+                        + code
+                    )
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as f:
+                    f.write(code)
+                    tmp_path = f.name
+                try:
+                    timeout = CONFIG["tools"].get("python_timeout", 300)
+                    env = os.environ.copy()
+                    if ORACLE_CLIENT_PATH:
+                        env["LD_LIBRARY_PATH"] = ORACLE_CLIENT_PATH + ":" + env.get("LD_LIBRARY_PATH", "")
+                    # 注入数据库密码为环境变量
+                    for env_key, env_val in _DB_PASSWORDS.items():
+                        env[env_key] = env_val
+                    result = subprocess.run(
+                        ["python3", tmp_path],
+                        capture_output=True, text=True,
+                        timeout=timeout, cwd=PROJECT_ROOT, env=env,
+                    )
+                    output = (result.stdout + result.stderr).strip() or "(无输出)"
+                except subprocess.TimeoutExpired:
+                    output = f"执行超时（{timeout}秒），代码已终止"
+                finally:
+                    os.unlink(tmp_path)
 
         else:
             output = f"未知工具: {name}"
@@ -706,6 +747,8 @@ def exec_tool(name: str, inp: dict) -> str:
     elapsed = time.time() - t0
     if len(output) > MAX_OUTPUT_LEN:
         output = output[:MAX_OUTPUT_LEN] + f"\n... (截断，共 {len(output)} 字符)"
+    # 输出脱敏：替换敏感信息
+    output = _sanitize_output(output)
     logger.info("工具完成: %s, 耗时: %.2fs, 结果长度: %d", name, elapsed, len(output))
     return output
 
