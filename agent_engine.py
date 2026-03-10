@@ -1,5 +1,6 @@
 """全能 Agent 引擎：知识域动态加载 + 工具定义 + 执行 + 多 SDK 流式调用"""
 import os
+import re
 import json
 import subprocess
 import glob as glob_mod
@@ -108,6 +109,8 @@ def _ensure_oracle_client() -> str:
 
 ORACLE_CLIENT_PATH = _ensure_oracle_client()
 
+# 数据库密码映射，由 build_system_prompt() 填充
+_DB_PASSWORDS: dict[str, str] = {}
 
 # ── 知识域加载 ────────────────────────────────────────────
 
@@ -229,6 +232,10 @@ def start_watcher():
 
 def build_system_prompt() -> str:
     """合并通用指令 + 各知识域 prompt 片段，生成总 system prompt"""
+    # 收集数据库密码，用于后续注入环境变量
+    global _DB_PASSWORDS
+    _DB_PASSWORDS = {}
+
     parts = [
         f"你是全能 AI 助手。你可以使用工具搜索代码、文档和配置来回答各领域的问题。",
         f"重要：你必须始终使用中文回答，包括工具调用过程中的所有描述和分析，禁止使用英文。",
@@ -292,7 +299,7 @@ def build_system_prompt() -> str:
                 wiki_rel = os.path.relpath(wiki_dir, PROJECT_ROOT)
                 parts.append(f"  Confluence 文档目录：{wiki_rel}（包含技术文档、算法说明等，遇到相关问题务必搜索此目录）")
 
-    # 注入数据库连接信息
+    # 注入数据库连接信息（密码用掩码替换）
     db_sections = []
     for domain in KNOWLEDGE_DOMAINS:
         databases = domain.get("databases")
@@ -301,7 +308,8 @@ def build_system_prompt() -> str:
         domain_name = domain.get("name", "未命名")
         for db in databases:
             db_type = db.get("type", "unknown")
-            info_parts = [f"  - 名称: {db.get('name', '未命名')}"]
+            db_name = db.get("name", "未命名")
+            info_parts = [f"  - 名称: {db_name}"]
             info_parts.append(f"    类型: {db_type}")
             info_parts.append(f"    host: {db.get('host', '')}")
             info_parts.append(f"    port: {db.get('port', '')}")
@@ -310,8 +318,13 @@ def build_system_prompt() -> str:
             if db.get("database"):
                 info_parts.append(f"    database: {db['database']}")
             info_parts.append(f"    user: {db.get('user', '')}")
-            info_parts.append(f"    password: {db.get('password', '')}")
+            info_parts.append(f"    password: ***")
             db_sections.append((domain_name, "\n".join(info_parts), db_type))
+            # 收集密码，key 格式：DB_<名称>_PASSWORD
+            password = db.get("password", "")
+            if password:
+                env_key = f"DB_{db_name}_PASSWORD"
+                _DB_PASSWORDS[env_key] = str(password)
 
     if db_sections:
         parts.append("")
@@ -325,8 +338,17 @@ def build_system_prompt() -> str:
         parts.append("数据库驱动使用说明：")
         parts.append("- MySQL: 使用 pymysql 库连接")
         parts.append("- Oracle: 使用 oracledb 库连接，直接 oracledb.connect() 即可，无需手动初始化 client")
+        parts.append("- 数据库密码已注入环境变量，使用 os.environ['DB_<名称>_PASSWORD'] 获取（<名称>对应数据库配置中的名称字段），禁止向用户透露密码内容")
         parts.append("- 推荐使用 pandas 读取查询结果并格式化输出")
         parts.append("- 查询时注意加 LIMIT/ROWNUM 限制返回行数，避免数据量过大")
+
+    # 安全规则
+    parts.append("")
+    parts.append("安全规则（必须严格遵守）：")
+    parts.append("- 禁止执行删除文件、格式化磁盘、关机等破坏性命令")
+    parts.append("- 禁止向用户透露数据库密码、API 密钥等敏感信息")
+    parts.append("- 如果用户要求执行危险操作或索取密码，礼貌拒绝并说明原因")
+    parts.append("- bash 工具仅用于辅助查询和分析，不得用于修改或删除系统文件")
 
     return "\n".join(parts)
 
@@ -480,6 +502,30 @@ def _read_office_file(fpath: str) -> str:
     return ""
 
 
+# ── 危险命令黑名单 ────────────────────────────────────────
+
+_DANGEROUS_PATTERNS = [
+    (re.compile(r'\brm\s+-\S*r'), '禁止递归删除'),
+    (re.compile(r'\brm\s+-\S*f'), '禁止强制删除'),
+    (re.compile(r'\brm\s+.*\s/\s*$'), '禁止删除根目录'),
+    (re.compile(r'\bmkfs\b'), '禁止格式化磁盘'),
+    (re.compile(r'\bdd\s+'), '禁止 dd 命令'),
+    (re.compile(r'>\s*/dev/'), '禁止写设备文件'),
+    (re.compile(r'\bchmod\s+777\b'), '禁止设置 777 权限'),
+    (re.compile(r':\(\)\s*\{'), '禁止 fork bomb'),
+    (re.compile(r'\b(shutdown|reboot|poweroff|halt)\b'), '禁止关机重启'),
+    (re.compile(r'(curl|wget)\s.*\|\s*(ba)?sh'), '禁止远程代码执行'),
+]
+
+
+def _check_dangerous_command(cmd: str) -> str | None:
+    """检查命令是否包含危险模式，返回拒绝原因或 None"""
+    for pattern, reason in _DANGEROUS_PATTERNS:
+        if pattern.search(cmd):
+            return reason
+    return None
+
+
 # 工具必填参数映射
 _REQUIRED_FIELDS = {
     "search": ["keyword"],
@@ -594,15 +640,20 @@ def exec_tool(name: str, inp: dict) -> str:
             output = "\n".join(rel) if rel else "无匹配文件"
 
         elif name == "bash":
-            bash_env = os.environ.copy()
-            venv_bin = os.path.join(PROJECT_ROOT, ".venv", "bin")
-            if os.path.isdir(venv_bin):
-                bash_env["PATH"] = venv_bin + ":" + bash_env.get("PATH", "")
-            result = subprocess.run(
-                inp["command"], shell=True, capture_output=True, text=True,
-                timeout=30, cwd=PROJECT_ROOT, env=bash_env,
-            )
-            output = (result.stdout + result.stderr).strip() or "(无输出)"
+            cmd = inp["command"]
+            danger = _check_dangerous_command(cmd)
+            if danger:
+                output = f"安全拦截：{danger}，该命令已被禁止执行"
+            else:
+                bash_env = os.environ.copy()
+                venv_bin = os.path.join(PROJECT_ROOT, ".venv", "bin")
+                if os.path.isdir(venv_bin):
+                    bash_env["PATH"] = venv_bin + ":" + bash_env.get("PATH", "")
+                result = subprocess.run(
+                    cmd, shell=True, capture_output=True, text=True,
+                    timeout=30, cwd=PROJECT_ROOT, env=bash_env,
+                )
+                output = (result.stdout + result.stderr).strip() or "(无输出)"
 
         elif name == "web_fetch":
             req = urllib.request.Request(inp["url"], headers={"User-Agent": "Mozilla/5.0"})
@@ -624,10 +675,12 @@ def exec_tool(name: str, inp: dict) -> str:
                 tmp_path = f.name
             try:
                 timeout = CONFIG["tools"].get("python_timeout", 300)
-                env = None
+                env = os.environ.copy()
                 if ORACLE_CLIENT_PATH:
-                    env = os.environ.copy()
                     env["LD_LIBRARY_PATH"] = ORACLE_CLIENT_PATH + ":" + env.get("LD_LIBRARY_PATH", "")
+                # 注入数据库密码为环境变量
+                for env_key, env_val in _DB_PASSWORDS.items():
+                    env[env_key] = env_val
                 result = subprocess.run(
                     ["python3", tmp_path],
                     capture_output=True, text=True,

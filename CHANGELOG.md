@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - config.yaml `server` 段新增 `title` 字段，网页标题可通过配置文件修改，不再硬编码
+- 工具安全加固：bash 工具执行前检查危险命令黑名单（rm -rf、mkfs、dd、fork bomb 等），命中则拒绝执行
+- 工具安全加固：system prompt 中数据库密码改为掩码显示，AI 无法向用户透露密码
+- 工具安全加固：run_python 执行时自动注入数据库密码为环境变量，代码通过 os.environ 获取
+- 工具安全加固：system prompt 追加安全规则，从源头约束 AI 不执行破坏性操作、不泄露敏感信息
 
 ### Fixed
 - bash 工具执行外部 Python 脚本时注入 `.venv/bin` 到 PATH，解决找不到虚拟环境依赖包的问题
