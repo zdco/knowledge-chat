@@ -164,16 +164,6 @@ def load_knowledge_domains() -> list[dict]:
                             "Confluence 转换失败 [%s]: %s", dname, e, exc_info=True
                         )
 
-            # 构建 Office/PDF 文本缓存
-            abs_dp = domain.get("_abs_data_path")
-            if abs_dp:
-                try:
-                    _build_text_cache(abs_dp)
-                except Exception as e:
-                    logging.getLogger(__name__).warning(
-                        "文本缓存构建失败 [%s]: %s", dname, e
-                    )
-
             domains.append(domain)
     return domains
 
@@ -192,6 +182,14 @@ def reload_domains():
         KNOWLEDGE_DOMAINS.clear()
         KNOWLEDGE_DOMAINS.extend(new_domains)
         SYSTEM_PROMPT = build_system_prompt()
+    # 重建文本缓存
+    for domain in new_domains:
+        abs_dp = domain.get("_abs_data_path")
+        if abs_dp:
+            try:
+                _build_text_cache(abs_dp)
+            except Exception as e:
+                logger.warning("文本缓存构建失败 [%s]: %s", domain.get("name", "?"), e)
     logger.info("知识域已热加载，当前 %d 个域", len(KNOWLEDGE_DOMAINS))
 
 
@@ -722,6 +720,16 @@ def _find_cache_file(fpath: str) -> str | None:
                     return cache_file
                 return None
     return None
+
+
+# ── 启动时构建文本缓存 ────────────────────────────────────
+for _domain in KNOWLEDGE_DOMAINS:
+    _abs_dp = _domain.get("_abs_data_path")
+    if _abs_dp:
+        try:
+            _build_text_cache(_abs_dp)
+        except Exception as _e:
+            logger.warning("文本缓存构建失败 [%s]: %s", _domain.get("name", "?"), _e)
 
 
 # ── 危险命令黑名单 ────────────────────────────────────────
