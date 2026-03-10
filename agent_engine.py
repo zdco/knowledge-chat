@@ -612,16 +612,33 @@ def _cache_path_for(data_dir: str, src_path: str) -> str:
 
 
 def _update_single_cache(data_dir: str, src_path: str) -> None:
-    """对单个 Office/PDF 文件生成或更新缓存"""
+    """对单个 Office/PDF 文件生成或更新缓存，使用临时文件+rename 保证原子写入"""
     cache_file = _cache_path_for(data_dir, src_path)
     try:
         text = _read_office_file(src_path)
         if text:
             os.makedirs(os.path.dirname(cache_file), exist_ok=True)
-            with open(cache_file, "w", encoding="utf-8") as f:
+            tmp_file = cache_file + ".tmp"
+            with open(tmp_file, "w", encoding="utf-8") as f:
                 f.write(text)
+            os.replace(tmp_file, cache_file)
     except Exception as e:
+        # 清理可能残留的临时文件
+        tmp_file = cache_file + ".tmp"
+        if os.path.isfile(tmp_file):
+            try:
+                os.remove(tmp_file)
+            except Exception:
+                pass
         logger.warning("缓存生成失败 %s: %s", src_path, e)
+
+
+def _save_meta(meta_path: str, meta: dict) -> None:
+    """原子写入 meta 文件"""
+    tmp = meta_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, meta_path)
 
 
 def _build_text_cache(data_dir: str) -> None:
@@ -653,10 +670,15 @@ def _build_text_cache(data_dir: str) -> None:
                 rel = os.path.relpath(fpath, data_dir)
                 current_files[rel] = os.path.getmtime(fpath)
 
-    # 增量更新：新增或 mtime 变化的文件
-    updated = False
-    need_update = [(rel, mtime) for rel, mtime in current_files.items()
-                   if rel not in meta or meta[rel] != mtime]
+    # 增量更新：新增、mtime 变化、或缓存文件不存在的
+    need_update = []
+    for rel, mtime in current_files.items():
+        cache_file = os.path.join(cache_dir, rel + ".txt")
+        if rel not in meta or meta[rel] != mtime or not os.path.isfile(cache_file):
+            need_update.append((rel, mtime))
+
+    os.makedirs(cache_dir, exist_ok=True)
+
     if need_update:
         total = len(need_update)
         logger.info("文本缓存：需更新 %d 个文件 (%s)", total, data_dir)
@@ -665,9 +687,10 @@ def _build_text_cache(data_dir: str) -> None:
             logger.info("文本缓存 [%d/%d]: %s", i, total, rel)
             _update_single_cache(data_dir, src_path)
             meta[rel] = mtime
-            updated = True
+            _save_meta(meta_path, meta)
 
     # 清理：源文件已删除的缓存
+    cleaned = False
     for rel in list(meta.keys()):
         if rel not in current_files:
             cache_file = os.path.join(cache_dir, rel + ".txt")
@@ -677,16 +700,13 @@ def _build_text_cache(data_dir: str) -> None:
                 except Exception:
                     pass
             del meta[rel]
-            updated = True
+            cleaned = True
 
-    # 写回元数据
-    if updated or not os.path.isfile(meta_path):
-        os.makedirs(cache_dir, exist_ok=True)
-        with open(meta_path, "w", encoding="utf-8") as f:
-            json.dump(meta, f, ensure_ascii=False, indent=2)
+    if cleaned:
+        _save_meta(meta_path, meta)
 
     if current_files:
-        logger.info("文本缓存已构建: %s (%d 个文件)", data_dir, len(current_files))
+        logger.info("文本缓存已就绪: %s (%d 个文件)", data_dir, len(current_files))
 
 
 def _restore_cache_path(grep_line: str, data_dir: str) -> str:
