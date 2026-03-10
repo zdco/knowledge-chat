@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- PDF 文件检索支持：`read_file` 和 `search` 工具支持读取和搜索 PDF 文件内容，基于 pdfplumber 按页提取文本
 - config.yaml `server` 段新增 `title` 字段，网页标题可通过配置文件修改，不再硬编码
 - 工具安全加固：bash 工具执行前检查危险命令黑名单（rm -rf、mkfs、dd、fork bomb 等），命中则拒绝执行
 - 工具安全加固：system prompt 中数据库密码改为掩码显示，AI 无法向用户透露密码

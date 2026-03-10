@@ -16,7 +16,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 # Office 文件扩展名集合
-_OFFICE_EXTS = {'.xlsx', '.xls', '.docx', '.pptx'}
+_OFFICE_EXTS = {'.xlsx', '.xls', '.docx', '.pptx', '.pdf'}
 
 # ── 加载配置 ──────────────────────────────────────────────
 
@@ -497,6 +497,17 @@ def _read_office_file(fpath: str) -> str:
             if texts:
                 parts.append(f"=== Slide {i} ===")
                 parts.append("\n".join(texts))
+        return "\n".join(parts)
+
+    if ext == '.pdf':
+        import pdfplumber
+        parts = []
+        with pdfplumber.open(fpath) as pdf:
+            for i, page in enumerate(pdf.pages, 1):
+                text = page.extract_text()
+                if text:
+                    parts.append(f"=== Page {i} ===")
+                    parts.append(text)
         return "\n".join(parts)
 
     return ""

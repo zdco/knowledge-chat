@@ -12,3 +12,4 @@ oracledb
 pandas
 beautifulsoup4
 markdownify
+pdfplumber
