@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 工具安全加固：所有工具输出统一脱敏，自动替换数据库密码和 API Key 为掩码
 
 ### Fixed
+- 工具详情展开后鼠标滚轮被内部 pre 元素捕获导致页面无法滚动：去掉嵌套滚动，改为 overflow-y:hidden + 展开全部按钮
 - AI 回复过程中展开工具详情导致自动滚动失效、内容显示不全：展开前记录滚动位置，展开后恢复自动跟随
 - AI 回复结束后前端卡住不恢复发送按钮：收到 done 事件后主动关闭 SSE 流并退出读取循环
 - bash 工具执行外部 Python 脚本时注入 `.venv/bin` 到 PATH，解决找不到虚拟环境依赖包的问题
