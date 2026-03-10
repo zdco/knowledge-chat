@@ -116,6 +116,8 @@ _DB_PASSWORDS: dict[str, str] = {}
 
 _KNOWLEDGE_DIR = os.path.join(_DIR, "knowledge")
 
+logger = logging.getLogger(__name__)
+
 
 def load_knowledge_domains() -> list[dict]:
     """扫描 knowledge/*/domain.yaml，返回知识域列表（跳过 _template）"""
@@ -162,6 +164,16 @@ def load_knowledge_domains() -> list[dict]:
                             "Confluence 转换失败 [%s]: %s", dname, e, exc_info=True
                         )
 
+            # 构建 Office/PDF 文本缓存
+            abs_dp = domain.get("_abs_data_path")
+            if abs_dp:
+                try:
+                    _build_text_cache(abs_dp)
+                except Exception as e:
+                    logging.getLogger(__name__).warning(
+                        "文本缓存构建失败 [%s]: %s", dname, e
+                    )
+
             domains.append(domain)
     return domains
 
@@ -169,7 +181,6 @@ def load_knowledge_domains() -> list[dict]:
 KNOWLEDGE_DOMAINS = load_knowledge_domains()
 
 _domains_lock = threading.Lock()
-logger = logging.getLogger(__name__)
 request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="-")
 
 
@@ -185,10 +196,11 @@ def reload_domains():
 
 
 class _DomainFileHandler(FileSystemEventHandler):
-    """监听 knowledge/*/domain.yaml 变化，防抖 1 秒后触发 reload"""
+    """监听 knowledge/ 目录变化：domain.yaml 触发 reload，Office/PDF 文件触发缓存更新"""
 
     def __init__(self):
         self._timer: threading.Timer | None = None
+        self._cache_timers: dict[str, threading.Timer] = {}
 
     def _schedule_reload(self):
         if self._timer is not None:
@@ -200,17 +212,97 @@ class _DomainFileHandler(FileSystemEventHandler):
     def _is_domain_yaml(self, path: str) -> bool:
         return os.path.basename(path) == "domain.yaml"
 
+    def _is_office_file(self, path: str) -> bool:
+        if ".text_cache" in path:
+            return False
+        ext = os.path.splitext(path)[1].lower()
+        return ext in _OFFICE_EXTS
+
+    def _find_data_dir(self, path: str) -> str | None:
+        """根据文件路径找到所属知识域的 data_dir"""
+        with _domains_lock:
+            for domain in KNOWLEDGE_DOMAINS:
+                data_dir = domain.get("_abs_data_path")
+                if data_dir and os.path.normpath(path).startswith(os.path.normpath(data_dir)):
+                    return data_dir
+        return None
+
+    def _schedule_cache_update(self, src_path: str, deleted: bool = False):
+        """防抖 1 秒后增量更新单个文件的缓存"""
+        key = src_path
+        if key in self._cache_timers:
+            self._cache_timers[key].cancel()
+
+        def _do_update():
+            data_dir = self._find_data_dir(src_path)
+            if not data_dir:
+                return
+            if deleted:
+                cache_file = _cache_path_for(data_dir, src_path)
+                if os.path.isfile(cache_file):
+                    try:
+                        os.remove(cache_file)
+                    except Exception:
+                        pass
+                # 更新 meta
+                meta_path = os.path.join(data_dir, ".text_cache", "_meta.json")
+                rel = os.path.relpath(src_path, data_dir)
+                if os.path.isfile(meta_path):
+                    try:
+                        with open(meta_path, "r", encoding="utf-8") as f:
+                            meta = json.load(f)
+                        meta.pop(rel, None)
+                        with open(meta_path, "w", encoding="utf-8") as f:
+                            json.dump(meta, f, ensure_ascii=False, indent=2)
+                    except Exception:
+                        pass
+                logger.info("缓存已删除: %s", src_path)
+            else:
+                _update_single_cache(data_dir, src_path)
+                # 更新 meta
+                meta_path = os.path.join(data_dir, ".text_cache", "_meta.json")
+                rel = os.path.relpath(src_path, data_dir)
+                try:
+                    meta = {}
+                    if os.path.isfile(meta_path):
+                        with open(meta_path, "r", encoding="utf-8") as f:
+                            meta = json.load(f)
+                    meta[rel] = os.path.getmtime(src_path)
+                    with open(meta_path, "w", encoding="utf-8") as f:
+                        json.dump(meta, f, ensure_ascii=False, indent=2)
+                except Exception:
+                    pass
+                logger.info("缓存已更新: %s", src_path)
+            self._cache_timers.pop(key, None)
+
+        t = threading.Timer(1.0, _do_update)
+        t.daemon = True
+        t.start()
+        self._cache_timers[key] = t
+
     def on_created(self, event):
-        if not event.is_directory and self._is_domain_yaml(event.src_path):
+        if event.is_directory:
+            return
+        if self._is_domain_yaml(event.src_path):
             self._schedule_reload()
+        elif self._is_office_file(event.src_path):
+            self._schedule_cache_update(event.src_path)
 
     def on_modified(self, event):
-        if not event.is_directory and self._is_domain_yaml(event.src_path):
+        if event.is_directory:
+            return
+        if self._is_domain_yaml(event.src_path):
             self._schedule_reload()
+        elif self._is_office_file(event.src_path):
+            self._schedule_cache_update(event.src_path)
 
     def on_deleted(self, event):
-        if not event.is_directory and self._is_domain_yaml(event.src_path):
+        if event.is_directory:
+            return
+        if self._is_domain_yaml(event.src_path):
             self._schedule_reload()
+        elif self._is_office_file(event.src_path):
+            self._schedule_cache_update(event.src_path, deleted=True)
 
 
 _observer: Observer | None = None
@@ -513,6 +605,120 @@ def _read_office_file(fpath: str) -> str:
     return ""
 
 
+# ── Office/PDF 文本缓存 ──────────────────────────────────
+
+def _cache_path_for(data_dir: str, src_path: str) -> str:
+    """返回源文件对应的缓存 txt 路径"""
+    rel = os.path.relpath(src_path, data_dir)
+    return os.path.join(data_dir, ".text_cache", rel + ".txt")
+
+
+def _update_single_cache(data_dir: str, src_path: str) -> None:
+    """对单个 Office/PDF 文件生成或更新缓存"""
+    cache_file = _cache_path_for(data_dir, src_path)
+    try:
+        text = _read_office_file(src_path)
+        if text:
+            os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+            with open(cache_file, "w", encoding="utf-8") as f:
+                f.write(text)
+    except Exception as e:
+        logger.warning("缓存生成失败 %s: %s", src_path, e)
+
+
+def _build_text_cache(data_dir: str) -> None:
+    """扫描 data_dir 下所有 Office/PDF 文件，增量生成纯文本缓存"""
+    if not os.path.isdir(data_dir):
+        return
+
+    cache_dir = os.path.join(data_dir, ".text_cache")
+    meta_path = os.path.join(cache_dir, "_meta.json")
+
+    # 读取已有元数据
+    meta: dict[str, float] = {}
+    if os.path.isfile(meta_path):
+        try:
+            with open(meta_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+        except Exception:
+            meta = {}
+
+    # 扫描所有 Office/PDF 文件
+    current_files: dict[str, float] = {}
+    for root, dirs, files in os.walk(data_dir):
+        # 跳过 .text_cache 目录本身
+        dirs[:] = [d for d in dirs if d != ".text_cache"]
+        for fname in files:
+            ext = os.path.splitext(fname)[1].lower()
+            if ext in _OFFICE_EXTS:
+                fpath = os.path.join(root, fname)
+                rel = os.path.relpath(fpath, data_dir)
+                current_files[rel] = os.path.getmtime(fpath)
+
+    # 增量更新：新增或 mtime 变化的文件
+    updated = False
+    for rel, mtime in current_files.items():
+        if rel not in meta or meta[rel] != mtime:
+            src_path = os.path.join(data_dir, rel)
+            _update_single_cache(data_dir, src_path)
+            meta[rel] = mtime
+            updated = True
+
+    # 清理：源文件已删除的缓存
+    for rel in list(meta.keys()):
+        if rel not in current_files:
+            cache_file = os.path.join(cache_dir, rel + ".txt")
+            if os.path.isfile(cache_file):
+                try:
+                    os.remove(cache_file)
+                except Exception:
+                    pass
+            del meta[rel]
+            updated = True
+
+    # 写回元数据
+    if updated or not os.path.isfile(meta_path):
+        os.makedirs(cache_dir, exist_ok=True)
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(meta, f, ensure_ascii=False, indent=2)
+
+    if current_files:
+        logger.info("文本缓存已构建: %s (%d 个文件)", data_dir, len(current_files))
+
+
+def _restore_cache_path(grep_line: str, data_dir: str) -> str:
+    """将 grep 输出中的缓存路径还原为原始 Office/PDF 文件路径
+    例：/path/data/.text_cache/sub/报告.pdf.txt:10:内容 → knowledge/xxx/data/sub/报告.pdf:10:内容
+    """
+    cache_dir = os.path.join(data_dir, ".text_cache")
+    # grep 输出格式：文件路径:行号:内容 或 文件路径-行号-内容（上下文行）
+    if cache_dir in grep_line:
+        # 替换 .text_cache/ 路径为 data_dir 路径，去掉 .txt 后缀
+        restored = grep_line.replace(cache_dir + os.sep, data_dir + os.sep)
+        # 处理 .pdf.txt:行号 → .pdf:行号
+        restored = re.sub(r'\.txt([:|-])', r'\1', restored, count=1)
+        # 转为相对路径显示
+        abs_prefix = data_dir + os.sep
+        if restored.startswith(abs_prefix):
+            rel_prefix = os.path.relpath(data_dir, PROJECT_ROOT) + os.sep
+            restored = rel_prefix + restored[len(abs_prefix):]
+        return restored
+    return grep_line
+
+
+def _find_cache_file(fpath: str) -> str | None:
+    """查找 Office/PDF 文件对应的缓存 txt，存在则返回路径，否则 None"""
+    with _domains_lock:
+        for domain in KNOWLEDGE_DOMAINS:
+            data_dir = domain.get("_abs_data_path")
+            if data_dir and os.path.normpath(fpath).startswith(os.path.normpath(data_dir)):
+                cache_file = _cache_path_for(data_dir, fpath)
+                if os.path.isfile(cache_file):
+                    return cache_file
+                return None
+    return None
+
+
 # ── 危险命令黑名单 ────────────────────────────────────────
 
 _DANGEROUS_PATTERNS = [
@@ -616,6 +822,7 @@ def exec_tool(name: str, inp: dict) -> str:
                 ["grep", "-E", "-r", "-n", f"-C{ctx}",
                  "--exclude-dir=logs", "--exclude-dir=shares",
                  "--exclude-dir=.venv", "--exclude-dir=__pycache__", "--exclude-dir=.git",
+                 "--exclude-dir=.text_cache",
                  "--include=*.jce",
                  "--include=*.h", "--include=*.cpp", "--include=*.md",
                  "--include=*.conf", "--include=*.xml", "--include=*.yaml",
@@ -625,24 +832,28 @@ def exec_tool(name: str, inp: dict) -> str:
             )
             output = result.stdout or result.stderr or "无匹配结果"
 
-            # 搜索 Office 文件
-            import re
-            office_matches = []
-            for ext in _OFFICE_EXTS:
-                for fpath in glob_mod.glob(os.path.join(path, "**", f"*{ext}"), recursive=True):
-                    try:
-                        text = _read_office_file(fpath)
-                        rel_path = os.path.relpath(fpath, PROJECT_ROOT)
-                        for line_no, line in enumerate(text.splitlines(), 1):
-                            if re.search(keyword, line, re.IGNORECASE):
-                                office_matches.append(f"{rel_path}:{line_no}: {line}")
-                    except Exception:
-                        continue
-            if office_matches:
+            # 搜索 Office/PDF 文本缓存
+            cache_matches = []
+            for cache_dir_path in glob_mod.glob(os.path.join(path, "**", ".text_cache"), recursive=True):
+                if not os.path.isdir(cache_dir_path):
+                    continue
+                cache_result = subprocess.run(
+                    ["grep", "-E", "-r", "-n", f"-C{ctx}",
+                     "--include=*.txt",
+                     keyword, cache_dir_path],
+                    capture_output=True, text=True, timeout=30,
+                )
+                if cache_result.stdout:
+                    # 还原路径：.text_cache/xxx.pdf.txt:行号 → xxx.pdf:行号
+                    data_dir = os.path.dirname(cache_dir_path)
+                    for line in cache_result.stdout.splitlines():
+                        restored = _restore_cache_path(line, data_dir)
+                        cache_matches.append(restored)
+            if cache_matches:
                 if output == "无匹配结果":
-                    output = "\n".join(office_matches)
+                    output = "\n".join(cache_matches)
                 else:
-                    output += "\n" + "\n".join(office_matches)
+                    output += "\n" + "\n".join(cache_matches)
 
             # 子目录搜索无结果时，自动扩大到整个 knowledge/ 目录重搜
             knowledge_dir = os.path.join(PROJECT_ROOT, "knowledge")
@@ -662,7 +873,17 @@ def exec_tool(name: str, inp: dict) -> str:
             fpath = _safe_path(inp["path"])
             ext = os.path.splitext(fpath)[1].lower()
             if ext in _OFFICE_EXTS:
-                output = _read_office_file(fpath) or "(空文件)"
+                # 优先读缓存
+                cache_file = _find_cache_file(fpath)
+                if cache_file:
+                    with open(cache_file, "r", encoding="utf-8", errors="replace") as f:
+                        lines = f.readlines()
+                    start = max(1, inp.get("start_line", 1))
+                    end = inp.get("end_line", len(lines))
+                    selected = lines[start - 1:end]
+                    output = "".join(f"{start + i}: {l}" for i, l in enumerate(selected))
+                else:
+                    output = _read_office_file(fpath) or "(空文件)"
             else:
                 with open(fpath, "r", encoding="utf-8", errors="replace") as f:
                     lines = f.readlines()

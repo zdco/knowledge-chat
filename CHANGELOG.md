@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Office/PDF 文本缓存预处理：启动时将二进制文件转为纯文本缓存到 `.text_cache/` 目录，search 工具 grep 搜缓存文件替代实时解析，read_file 优先读缓存
+- watchdog 监听 Office/PDF 文件变更，自动增量更新文本缓存（新增/修改/删除）
 - PDF 文件检索支持：`read_file` 和 `search` 工具支持读取和搜索 PDF 文件内容，基于 pdfplumber 按页提取文本
 - config.yaml `server` 段新增 `title` 字段，网页标题可通过配置文件修改，不再硬编码
 - 工具安全加固：bash 工具执行前检查危险命令黑名单（rm -rf、mkfs、dd、fork bomb 等），命中则拒绝执行
