@@ -683,7 +683,8 @@ def exec_tool(name: str, inp: dict) -> str:
             cmd = inp["command"]
             danger = _check_dangerous_command(cmd)
             if danger:
-                output = f"安全拦截：{danger}，该命令已被禁止执行"
+                logger.warning("bash 命令被安全拦截: %s, 原因: %s", cmd, danger)
+                output = "该命令因安全策略被拒绝执行，请使用其他方式完成任务"
             else:
                 bash_env = os.environ.copy()
                 venv_bin = os.path.join(PROJECT_ROOT, ".venv", "bin")
@@ -706,7 +707,8 @@ def exec_tool(name: str, inp: dict) -> str:
             # 安全检查
             danger = _check_dangerous_python(code)
             if danger:
-                output = f"安全拦截：{danger}，该代码已被禁止执行"
+                logger.warning("Python 代码被安全拦截: %s, 原因: %s", code[:200], danger)
+                output = "该代码因安全策略被拒绝执行，请使用其他方式完成任务"
             else:
                 # 如果配置了 Oracle Client 路径，自动注入初始化代码
                 if ORACLE_CLIENT_PATH and "oracledb" in code and "init_oracle_client" not in code:
