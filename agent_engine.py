@@ -505,23 +505,27 @@ def _read_office_file(fpath: str) -> str:
 # ── 危险命令黑名单 ────────────────────────────────────────
 
 _DANGEROUS_PATTERNS = [
-    (re.compile(r'\brm\s+-\S*r'), '禁止递归删除'),
-    (re.compile(r'\brm\s+-\S*f'), '禁止强制删除'),
-    (re.compile(r'\brm\s+.*\s/\s*$'), '禁止删除根目录'),
-    (re.compile(r'\bmkfs\b'), '禁止格式化磁盘'),
-    (re.compile(r'\bdd\s+'), '禁止 dd 命令'),
-    (re.compile(r'>\s*/dev/'), '禁止写设备文件'),
-    (re.compile(r'\bchmod\s+777\b'), '禁止设置 777 权限'),
+    (re.compile(r'\brm\s+-\S*r', re.IGNORECASE), '禁止递归删除'),
+    (re.compile(r'\brm\s+-\S*f', re.IGNORECASE), '禁止强制删除'),
+    (re.compile(r'\brm\s+.*\s/\s*$', re.IGNORECASE), '禁止删除根目录'),
+    (re.compile(r'\bmkfs\b', re.IGNORECASE), '禁止格式化磁盘'),
+    (re.compile(r'\bdd\s+', re.IGNORECASE), '禁止 dd 命令'),
+    (re.compile(r'>\s*/dev/', re.IGNORECASE), '禁止写设备文件'),
+    (re.compile(r'\bchmod\s+777\b', re.IGNORECASE), '禁止设置 777 权限'),
     (re.compile(r':\(\)\s*\{'), '禁止 fork bomb'),
-    (re.compile(r'\b(shutdown|reboot|poweroff|halt)\b'), '禁止关机重启'),
-    (re.compile(r'(curl|wget)\s.*\|\s*(ba)?sh'), '禁止远程代码执行'),
+    (re.compile(r'\b(shutdown|reboot|poweroff|halt)\b', re.IGNORECASE), '禁止关机重启'),
+    (re.compile(r'(curl|wget)\s.*\|\s*(ba)?sh', re.IGNORECASE), '禁止远程代码执行'),
+    (re.compile(r'curl\s.*-d\s+@', re.IGNORECASE), '禁止通过 curl 外泄数据'),
+    (re.compile(r'curl\s.*--data\s+@', re.IGNORECASE), '禁止通过 curl 外泄数据'),
 ]
 
 
 def _check_dangerous_command(cmd: str) -> str | None:
     """检查命令是否包含危险模式，返回拒绝原因或 None"""
+    # 去除反斜杠转义绕过
+    normalized = cmd.replace('\\', '')
     for pattern, reason in _DANGEROUS_PATTERNS:
-        if pattern.search(cmd):
+        if pattern.search(normalized):
             return reason
     return None
 
