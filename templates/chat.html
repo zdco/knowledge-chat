@@ -275,6 +275,13 @@ function addToolBlock(toolName,input){
       <div class="label">输出结果</div>
       <pre class="tool-output-pre">等待结果...</pre>
     </div>`;
+  let wasNearBottom=true;
+  block.querySelector('summary').addEventListener('click',()=>{
+    wasNearBottom=isNearBottom();
+  });
+  block.addEventListener('toggle',()=>{
+    if(wasNearBottom){userScrolled=false;scrollBottom()}
+  });
   chatBox.appendChild(block);
   scrollBottom();
   return block;
