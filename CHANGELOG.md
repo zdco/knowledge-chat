@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - PDF 解析引擎从 pdfplumber 切换为 PyMuPDF（fitz），全量缓存构建速度提升约 5 倍
 
 ### Fixed
+- bash 安全规则误拦 `2>/dev/null` 重定向：修正正则排除 `/dev/null`，只拦截写其他设备文件
 - 工具详情展开后鼠标滚轮被内部 pre 元素捕获导致页面无法滚动：去掉嵌套滚动，改为 overflow-y:hidden + 展开全部按钮
 - AI 回复过程中展开工具详情导致自动滚动失效、内容显示不全：展开前记录滚动位置，展开后恢复自动跟随
 - AI 回复结束后前端卡住不恢复发送按钮：收到 done 事件后主动关闭 SSE 流并退出读取循环

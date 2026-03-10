@@ -798,7 +798,7 @@ _DANGEROUS_PATTERNS = [
     (re.compile(r'\brm\s+.*\s/\s*$', re.IGNORECASE), '禁止删除根目录'),
     (re.compile(r'\bmkfs\b', re.IGNORECASE), '禁止格式化磁盘'),
     (re.compile(r'\bdd\s+', re.IGNORECASE), '禁止 dd 命令'),
-    (re.compile(r'>\s*/dev/', re.IGNORECASE), '禁止写设备文件'),
+    (re.compile(r'(?<!\d)>\s*/dev/(?!null)', re.IGNORECASE), '禁止写设备文件'),
     (re.compile(r'\bchmod\s+777\b', re.IGNORECASE), '禁止设置 777 权限'),
     (re.compile(r':\(\)\s*\{'), '禁止 fork bomb'),
     (re.compile(r'\b(shutdown|reboot|poweroff|halt)\b', re.IGNORECASE), '禁止关机重启'),
