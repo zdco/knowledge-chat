@@ -590,15 +590,27 @@ def _read_office_file(fpath: str) -> str:
         return "\n".join(parts)
 
     if ext == '.pdf':
-        import pdfplumber
-        parts = []
-        with pdfplumber.open(fpath) as pdf:
-            for i, page in enumerate(pdf.pages, 1):
-                text = page.extract_text()
-                if text:
+        try:
+            import fitz  # PyMuPDF，速度远快于 pdfplumber
+            parts = []
+            doc = fitz.open(fpath)
+            for i, page in enumerate(doc, 1):
+                text = page.get_text()
+                if text and text.strip():
                     parts.append(f"=== Page {i} ===")
                     parts.append(text)
-        return "\n".join(parts)
+            doc.close()
+            return "\n".join(parts)
+        except ImportError:
+            import pdfplumber
+            parts = []
+            with pdfplumber.open(fpath) as pdf:
+                for i, page in enumerate(pdf.pages, 1):
+                    text = page.extract_text()
+                    if text:
+                        parts.append(f"=== Page {i} ===")
+                        parts.append(text)
+            return "\n".join(parts)
 
     return ""
 

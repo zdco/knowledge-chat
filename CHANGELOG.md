@@ -19,6 +19,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 工具安全加固：run_python 增加危险代码检查（os.system、subprocess、shutil.rmtree 等），禁止执行系统命令
 - 工具安全加固：所有工具输出统一脱敏，自动替换数据库密码和 API Key 为掩码
 
+### Changed
+- PDF 解析引擎从 pdfplumber 切换为 PyMuPDF（fitz），全量缓存构建速度提升约 5 倍
+
 ### Fixed
 - 工具详情展开后鼠标滚轮被内部 pre 元素捕获导致页面无法滚动：去掉嵌套滚动，改为 overflow-y:hidden + 展开全部按钮
 - AI 回复过程中展开工具详情导致自动滚动失效、内容显示不全：展开前记录滚动位置，展开后恢复自动跟随
