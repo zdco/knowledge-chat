@@ -10,7 +10,7 @@ from logging.handlers import TimedRotatingFileHandler
 from flask import Flask, render_template, request, Response, send_from_directory
 
 from agent_engine import run_agent_stream, CONFIG, KNOWLEDGE_DOMAINS, start_watcher, request_id_var, \
-    BASE_URL, MODEL, API_FORMAT, ORACLE_CLIENT_PATH
+    BASE_URL, MODEL, API_FORMAT, ORACLE_CLIENT_PATH, init_text_cache
 
 # ── 日志初始化 ────────────────────────────────────────────
 _log_cfg = CONFIG.get("logging", {})
@@ -47,6 +47,7 @@ logging.basicConfig(level=_log_level, handlers=[_console_handler, _file_handler]
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+init_text_cache()
 start_watcher()
 
 SITE_TITLE = CONFIG.get("server", {}).get("title", "全能 AI 助手")

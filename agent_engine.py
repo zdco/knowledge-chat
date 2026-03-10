@@ -723,13 +723,15 @@ def _find_cache_file(fpath: str) -> str | None:
 
 
 # ── 启动时构建文本缓存 ────────────────────────────────────
-for _domain in KNOWLEDGE_DOMAINS:
-    _abs_dp = _domain.get("_abs_data_path")
-    if _abs_dp:
-        try:
-            _build_text_cache(_abs_dp)
-        except Exception as _e:
-            logger.warning("文本缓存构建失败 [%s]: %s", _domain.get("name", "?"), _e)
+def init_text_cache():
+    """初始化所有知识域的文本缓存，应在 logging 配置完成后调用"""
+    for domain in KNOWLEDGE_DOMAINS:
+        abs_dp = domain.get("_abs_data_path")
+        if abs_dp:
+            try:
+                _build_text_cache(abs_dp)
+            except Exception as e:
+                logger.warning("文本缓存构建失败 [%s]: %s", domain.get("name", "?"), e)
 
 
 # ── 危险命令黑名单 ────────────────────────────────────────
