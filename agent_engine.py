@@ -682,12 +682,30 @@ def _build_text_cache(data_dir: str) -> None:
     if need_update:
         total = len(need_update)
         logger.info("文本缓存：需更新 %d 个文件 (%s)", total, data_dir)
-        for i, (rel, mtime) in enumerate(need_update, 1):
+
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        import multiprocessing
+        workers = min(len(need_update), max(2, multiprocessing.cpu_count()))
+        done_count = 0
+        meta_lock = threading.Lock()
+
+        def _process(rel, mtime):
             src_path = os.path.join(data_dir, rel)
-            logger.info("文本缓存 [%d/%d]: %s", i, total, rel)
             _update_single_cache(data_dir, src_path)
-            meta[rel] = mtime
-            _save_meta(meta_path, meta)
+            return rel, mtime
+
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(_process, rel, mtime): rel for rel, mtime in need_update}
+            for future in as_completed(futures):
+                try:
+                    rel, mtime = future.result()
+                    with meta_lock:
+                        meta[rel] = mtime
+                        done_count += 1
+                        logger.info("文本缓存 [%d/%d]: %s", done_count, total, rel)
+                        _save_meta(meta_path, meta)
+                except Exception as e:
+                    logger.warning("文本缓存处理失败: %s", e)
 
     # 清理：源文件已删除的缓存
     cleaned = False
