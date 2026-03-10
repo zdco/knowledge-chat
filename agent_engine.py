@@ -683,29 +683,35 @@ def _build_text_cache(data_dir: str) -> None:
         total = len(need_update)
         logger.info("文本缓存：需更新 %d 个文件 (%s)", total, data_dir)
 
-        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from concurrent.futures import ProcessPoolExecutor, as_completed
         import multiprocessing
         workers = min(len(need_update), max(2, multiprocessing.cpu_count()))
         done_count = 0
-        meta_lock = threading.Lock()
 
-        def _process(rel, mtime):
-            src_path = os.path.join(data_dir, rel)
-            _update_single_cache(data_dir, src_path)
-            return rel, mtime
+        with ProcessPoolExecutor(max_workers=workers) as pool:
+            # 子进程只做解析，返回 (rel, mtime, text)
+            futures = {}
+            for rel, mtime in need_update:
+                src_path = os.path.join(data_dir, rel)
+                futures[pool.submit(_read_office_file, src_path)] = (rel, mtime)
 
-        with ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = {pool.submit(_process, rel, mtime): rel for rel, mtime in need_update}
             for future in as_completed(futures):
+                rel, mtime = futures[future]
                 try:
-                    rel, mtime = future.result()
-                    with meta_lock:
-                        meta[rel] = mtime
-                        done_count += 1
-                        logger.info("文本缓存 [%d/%d]: %s", done_count, total, rel)
-                        _save_meta(meta_path, meta)
+                    text = future.result()
+                    if text:
+                        cache_file = os.path.join(cache_dir, rel + ".txt")
+                        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+                        tmp_file = cache_file + ".tmp"
+                        with open(tmp_file, "w", encoding="utf-8") as f:
+                            f.write(text)
+                        os.replace(tmp_file, cache_file)
+                    meta[rel] = mtime
+                    done_count += 1
+                    logger.info("文本缓存 [%d/%d]: %s", done_count, total, rel)
+                    _save_meta(meta_path, meta)
                 except Exception as e:
-                    logger.warning("文本缓存处理失败: %s", e)
+                    logger.warning("文本缓存处理失败 %s: %s", rel, e)
 
     # 清理：源文件已删除的缓存
     cleaned = False
