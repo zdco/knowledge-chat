@@ -148,28 +148,42 @@ class SessionManager:
         """加载服务代码到 session，支持 git worktree / 普通目录复制。返回代码路径。
 
         Args:
-            repo: 仓库路径（本地路径或远程 URL）
+            repo: 默认仓库路径（本地路径或远程 URL）
             version: 版本（branch/tag/commit hash/版本别名）
-            sub_path: monorepo 子路径
-            versions_map: 版本别名映射，如 {"v2.3.1": "abc1234", "生产环境": "def5678"}
+            sub_path: 默认 monorepo 子路径
+            versions_map: 版本别名映射，支持两种格式：
+                简写: {"v2.3.1": "abc1234"}
+                完整: {"客户A-v2.3.1": {"repo": "git@old-gitlab:xxx.git", "ref": "abc1234", "sub_path": "src"}}
         """
         meta = self.get_meta(session_id)
         worktrees = meta.get("worktrees", {})
 
-        # 解析版本别名
+        # 解析版本别名 — 可能覆盖 repo 和 sub_path
+        actual_repo = repo
+        actual_sub_path = sub_path
         resolved_version = version
         if version and versions_map and version in versions_map:
-            resolved_version = versions_map[version]
+            v = versions_map[version]
+            if isinstance(v, dict):
+                # 完整格式：可覆盖 repo、ref、sub_path
+                actual_repo = v.get("repo", repo)
+                resolved_version = v.get("ref", version)
+                actual_sub_path = v.get("sub_path", sub_path)
+            else:
+                # 简写格式：值就是 git ref
+                resolved_version = v
 
         effective_version = resolved_version or "HEAD"
+        # 用 repo+version 组合作为缓存 key，避免不同 repo 的同名版本冲突
+        cache_key = f"{actual_repo}@{effective_version}"
 
         # 已存在且版本相同则复用
         if service_id in worktrees:
             existing = worktrees[service_id]
-            if existing.get("version") == effective_version:
+            if existing.get("_cache_key") == cache_key:
                 code_path = existing["path"]
-                if sub_path:
-                    code_path = os.path.join(code_path, sub_path)
+                if actual_sub_path:
+                    code_path = os.path.join(code_path, actual_sub_path)
                 if os.path.isdir(code_path):
                     return code_path
 
@@ -193,7 +207,7 @@ class SessionManager:
         os.makedirs(os.path.dirname(wt_path), exist_ok=True)
 
         # 确保 repo 在本地
-        local_repo = self._ensure_local_repo(repo)
+        local_repo = self._ensure_local_repo(actual_repo)
 
         if self._is_git_repo(local_repo):
             # git 仓库：用 worktree
@@ -220,14 +234,15 @@ class SessionManager:
             "version": effective_version,
             "version_label": version if version != resolved_version else None,
             "source_type": source_type,
+            "_cache_key": cache_key,
             "created_at": datetime.now().isoformat(),
         }
         meta["worktrees"] = worktrees
         self.save_meta(session_id, meta)
 
         code_path = wt_path
-        if sub_path:
-            code_path = os.path.join(code_path, sub_path)
+        if actual_sub_path:
+            code_path = os.path.join(code_path, actual_sub_path)
         logger.info("代码已加载: %s @ %s → %s (%s)", service_id, effective_version, code_path, source_type)
         return code_path
 

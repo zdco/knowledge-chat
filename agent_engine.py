@@ -678,12 +678,12 @@ _ANALYZER_TOOLS = [
     },
     {
         "name": "switch_service",
-        "description": "加载服务代码到当前会话（创建 git worktree），后续可用 search/read_file 查看代码。",
+        "description": "加载服务代码到当前会话，后续可用 search/read_file 查看代码。version 可传分支名、tag、commit hash，也可传 versions 中定义的别名（如客户名+版本号）。",
         "input_schema": {
             "type": "object",
             "properties": {
                 "service": {"type": "string", "description": "服务 ID"},
-                "version": {"type": "string", "description": "版本/分支/tag（可选，默认 HEAD）"},
+                "version": {"type": "string", "description": "版本别名/分支/tag/commit（可选，默认 HEAD）。不同客户可能对应不同版本别名，如 '客户A-v2.3.1'"},
             },
             "required": ["service"],
         },

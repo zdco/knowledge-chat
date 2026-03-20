@@ -3,52 +3,85 @@
 # 使用方法：参考 AI_GUIDE_ANALYZER.md
 
 services:
-  # ── 示例 1：本地 git 仓库 ──────────────────────
+  # ── 示例 1：基本配置 ────────────────────────────
   # market_gateway:
   #   name: "行情网关"
-  #   repo: "/data/repos/market_gateway"       # 本地 git 仓库路径
+  #   repo: "/data/repos/market_gateway"
   #   language: "C++"
   #   depends_on: [data_server, config_center]
   #   description: "接收交易所行情数据并分发"
-  #   # 版本别名映射（可选）：客户环境版本 → git commit/tag
-  #   versions:
-  #     v2.3.1: "abc1234"                      # 客户 A 生产环境
-  #     v2.2.0: "release/2.2.0"                # 客户 B 生产环境
-  #     生产环境: "abc1234"                      # 中文别名也可以
 
-  # ── 示例 2：远程 git 仓库（自动 clone）─────────
+  # ── 示例 2：不同客户对应不同 git 仓库 ──────────
+  # 同一个服务，因为 git 迁移过，不同客户的代码在不同仓库
+  # trade_engine:
+  #   name: "交易引擎"
+  #   repo: "https://new-gitlab.example.com/trading/engine.git"   # 默认仓库（最新）
+  #   language: "C++"
+  #   depends_on: [risk_control, market_gateway]
+  #   description: "核心交易撮合引擎"
+  #   versions:
+  #     # 简写：版本别名 → git ref（使用默认 repo）
+  #     v3.0.0: "release/3.0.0"
+  #     latest: "main"
+  #
+  #     # 完整格式：版本别名 → {repo, ref, sub_path}
+  #     # 客户A 还在用老 gitlab 上的代码
+  #     客户A-v2.3.1:
+  #       repo: "https://old-gitlab.example.com/legacy/trade-engine.git"
+  #       ref: "abc1234def5678"
+  #
+  #     # 客户B 用的是迁移前的另一个仓库
+  #     客户B-v2.5.0:
+  #       repo: "git@internal-git:trading/engine-v2.git"
+  #       ref: "release/2.5.0"
+  #
+  #     # 客户C 给了一份代码目录（非 git）
+  #     客户C-v1.8:
+  #       repo: "/data/customer_code/clientC/trade_engine"
+  #       ref: "HEAD"
+
+  # ── 示例 3：远程 git 仓库（自动 clone）─────────
   # auth_service:
   #   name: "认证服务"
-  #   repo: "https://gitlab.example.com/backend/auth.git"  # 远程 URL，首次使用自动 clone
+  #   repo: "https://gitlab.example.com/backend/auth.git"
   #   language: "Java"
   #   depends_on: []
   #   description: "用户认证和权限管理"
 
-  # ── 示例 3：monorepo 子路径 ────────────────────
+  # ── 示例 4：monorepo 子路径 ────────────────────
   # data_server:
   #   name: "数据服务"
   #   repo: "/data/repos/monorepo"
-  #   sub_path: "services/data_server"          # 仓库内的子目录
+  #   sub_path: "services/data_server"
   #   language: "Java"
   #   depends_on: [database]
   #   description: "数据存储和查询服务"
+  #   versions:
+  #     # monorepo 中不同客户可能子路径也不同
+  #     客户A-v1.0:
+  #       ref: "abc1234"
+  #       sub_path: "modules/data_server"    # 老版本目录结构不同
 
-  # ── 示例 4：非 git 目录（直接复制）─────────────
+  # ── 示例 5：非 git 目录 ────────────────────────
   # legacy_system:
   #   name: "老系统"
-  #   repo: "/data/customer/legacy_code"        # 普通目录（非 git），会整个复制
+  #   repo: "/data/customer/legacy_code"
   #   language: "C"
   #   depends_on: []
   #   description: "客户提供的老版本代码，无 git 历史"
 
-# 说明：
-# - repo 支持三种格式：
+# ── 配置说明 ──────────────────────────────────────
+#
+# repo 支持三种格式：
 #   1. 本地 git 仓库路径（如 /data/repos/xxx）
 #   2. 远程 git URL（如 https://... 或 git@...），首次使用时自动 clone
 #   3. 本地普通目录（非 git），会复制到 session 隔离目录
 #
-# - versions 字段（可选）：
-#   当客户运行的版本在 git 分支/tag 中找不到时，可以手动映射版本号到 commit hash
-#   AI 调用 switch_service 时传入版本别名，自动解析为实际的 commit
+# versions 字段支持两种格式：
+#   简写：  版本别名: "git-ref"           → 使用服务默认的 repo
+#   完整：  版本别名:                      → 可覆盖 repo、ref、sub_path
+#             repo: "另一个仓库地址"
+#             ref: "commit-hash"
+#             sub_path: "子路径"
 #
-# - 用户也可以在对话中直接上传代码压缩包，AI 会自动解压并加载
+# 用户也可以在对话中直接上传代码压缩包，无需在此配置
