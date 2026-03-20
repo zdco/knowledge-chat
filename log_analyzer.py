@@ -19,8 +19,9 @@ logger = logging.getLogger(__name__)
 # ── Git URL 解析 ──────────────────────────────────────────
 
 # 匹配 GitLab/GitHub 的 /tree/branch/path 或 /-/tree/branch/path 格式
+# 仓库路径支持任意层级（GitLab 支持嵌套 group）
 _TREE_URL_RE = re.compile(
-    r'^(https?://[^/]+/[^/]+/[^/]+?)(?:/-)?/tree/([^/]+)(?:/(.+?))?/?$'
+    r'^(https?://[^/]+/.+?)(?:/-)?/tree/([^/]+)(?:/(.+?))?/?$'
 )
 
 
