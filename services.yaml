@@ -25,6 +25,15 @@ services:
   #       repo: "/data/customer_code/clientC/trade_engine"
   #       sub_path: "src"
 
+  # ── 示例 3：直接粘贴 GitLab 页面地址 ──────────
+  # 自动解析出仓库地址、分支、子路径，不需要手动拆分
+  # db_query_server:
+  #   name: "数据查询服务"
+  #   repo: "http://gitlab.whup.com/UPService-HQSystem/Data_Servers/tree/dev/DbQueryServer"
+  #   language: "C++"
+  #   depends_on: []
+  #   description: "数据查询服务"
+
   # ── 示例 3：monorepo 子路径 ────────────────────
   # data_server:
   #   name: "数据服务"

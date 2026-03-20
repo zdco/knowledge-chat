@@ -43,18 +43,34 @@
 services:
   <service_id>:
     name: "<中文名称>"
-    repo: "<默认仓库路径或远程URL>"
-    sub_path: "<子路径>"          # 仅 monorepo 需要，否则省略
+    repo: "<仓库地址>"              # 支持直接粘贴 GitLab 页面地址（见下方说明）
+    sub_path: "<子路径>"            # 仅 monorepo 需要，否则省略
     language: "<语言>"
     depends_on: [<依赖服务ID列表>]
     description: "<服务描述>"
-    client_repos:                 # 可选：不同客户的仓库地址
+    client_repos:                   # 可选：不同客户的仓库地址
       客户A: "https://old-gitlab.example.com/xxx.git"
       客户B: "git@another-git:xxx.git"
       客户C:
         repo: "/data/customer_code/xxx"
-        sub_path: "src"           # 该客户的子路径不同时才需要
+        sub_path: "src"             # 该客户的子路径不同时才需要
 ```
+
+**repo 支持直接粘贴 GitLab/GitHub 页面地址**，系统会自动解析出仓库地址、分支和子路径：
+
+```yaml
+# 用户提供的地址：
+repo: "http://gitlab.whup.com/UPService-HQSystem/Data_Servers/tree/dev/DbQueryServer"
+# 自动解析为：仓库 Data_Servers.git，默认分支 dev，子路径 DbQueryServer
+# 不需要手动拆分 repo 和 sub_path
+
+# 以下格式都支持自动解析：
+# http://gitlab.example.com/group/project/tree/branch/path
+# http://gitlab.example.com/group/project/-/tree/branch/path
+# http://gitlab.example.com/group/project.git          （普通 git 地址也行）
+```
+
+所以当用户提供 GitLab 页面链接时，直接写入 `repo` 字段即可，不需要手动提取仓库地址和子路径。
 
 ### 第四步：验证
 
