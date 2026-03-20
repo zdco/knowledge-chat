@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - 日志分析模式（log-analyzer）：config.yaml 新增 `mode` 字段切换运行模式，`analyzer` 配置段定义 session/worktree 参数
 - 服务注册表（services.yaml）：定义微服务名称、仓库路径、语言、依赖关系，支持 AI 通过对话自动生成
+- services.yaml `repo` 支持三种格式：本地 git 仓库、远程 git URL（自动 clone）、本地普通目录（自动复制）
+- services.yaml `versions` 字段：版本别名映射，解决客户老版本在 git 中找不到的问题（如 `v2.3.1: "abc1234"`）
+- 支持用户上传代码压缩包作为代码来源（`setup_from_upload`），自动解压到 session 隔离目录
 - AI_GUIDE_ANALYZER.md：服务注册指南，AI 按指南自动扫描代码仓库并生成 services.yaml 配置
 - log_analyzer.py：SessionManager 管理分析会话（创建/清理/过期回收）、git worktree 版本隔离、文件上传处理（zip/tar.gz 自动解压）、日志预处理（ERROR 摘要提取、按级别/关键词/时间范围过滤）
 - 新增 4 个日志分析专用工具：read_log（日志过滤读取）、trace_dependency（依赖链查询）、switch_service（加载服务代码 worktree）、list_services（列出已注册服务）

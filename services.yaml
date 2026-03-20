@@ -3,18 +3,52 @@
 # 使用方法：参考 AI_GUIDE_ANALYZER.md
 
 services:
-  # 示例（取消注释并修改）：
+  # ── 示例 1：本地 git 仓库 ──────────────────────
   # market_gateway:
   #   name: "行情网关"
-  #   repo: "/data/repos/market_gateway"
+  #   repo: "/data/repos/market_gateway"       # 本地 git 仓库路径
   #   language: "C++"
   #   depends_on: [data_server, config_center]
-  #   description: "行情网关服务，负责接收交易所行情数据并分发"
-  #
+  #   description: "接收交易所行情数据并分发"
+  #   # 版本别名映射（可选）：客户环境版本 → git commit/tag
+  #   versions:
+  #     v2.3.1: "abc1234"                      # 客户 A 生产环境
+  #     v2.2.0: "release/2.2.0"                # 客户 B 生产环境
+  #     生产环境: "abc1234"                      # 中文别名也可以
+
+  # ── 示例 2：远程 git 仓库（自动 clone）─────────
+  # auth_service:
+  #   name: "认证服务"
+  #   repo: "https://gitlab.example.com/backend/auth.git"  # 远程 URL，首次使用自动 clone
+  #   language: "Java"
+  #   depends_on: []
+  #   description: "用户认证和权限管理"
+
+  # ── 示例 3：monorepo 子路径 ────────────────────
   # data_server:
   #   name: "数据服务"
   #   repo: "/data/repos/monorepo"
-  #   sub_path: "services/data_server"
+  #   sub_path: "services/data_server"          # 仓库内的子目录
   #   language: "Java"
   #   depends_on: [database]
   #   description: "数据存储和查询服务"
+
+  # ── 示例 4：非 git 目录（直接复制）─────────────
+  # legacy_system:
+  #   name: "老系统"
+  #   repo: "/data/customer/legacy_code"        # 普通目录（非 git），会整个复制
+  #   language: "C"
+  #   depends_on: []
+  #   description: "客户提供的老版本代码，无 git 历史"
+
+# 说明：
+# - repo 支持三种格式：
+#   1. 本地 git 仓库路径（如 /data/repos/xxx）
+#   2. 远程 git URL（如 https://... 或 git@...），首次使用时自动 clone
+#   3. 本地普通目录（非 git），会复制到 session 隔离目录
+#
+# - versions 字段（可选）：
+#   当客户运行的版本在 git 分支/tag 中找不到时，可以手动映射版本号到 commit hash
+#   AI 调用 switch_service 时传入版本别名，自动解析为实际的 commit
+#
+# - 用户也可以在对话中直接上传代码压缩包，AI 会自动解压并加载

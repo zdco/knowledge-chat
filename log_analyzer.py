@@ -103,16 +103,70 @@ class SessionManager:
         with open(meta_path, "w", encoding="utf-8") as f:
             json.dump(meta, f, ensure_ascii=False, indent=2)
 
-    def setup_worktree(self, session_id: str, service_id: str, repo: str,
-                       version: str = None, sub_path: str = None) -> str:
-        """创建 git worktree，返回代码路径"""
+    def _ensure_local_repo(self, repo: str) -> str:
+        """确保 repo 在本地可用。远程 URL 自动 clone 到 repos_dir，本地路径直接返回。"""
+        # 判断是否为远程 URL
+        if repo.startswith(("http://", "https://", "git@", "ssh://")):
+            # 从 URL 提取仓库名
+            repo_name = repo.rstrip("/").rsplit("/", 1)[-1]
+            if repo_name.endswith(".git"):
+                repo_name = repo_name[:-4]
+            local_repo = os.path.join(self.worktree_base, "_repos", repo_name)
+
+            if os.path.isdir(os.path.join(local_repo, ".git")):
+                # 已 clone，fetch 更新
+                logger.info("更新仓库: %s", repo_name)
+                subprocess.run(
+                    ["git", "fetch", "--all", "--tags"],
+                    cwd=local_repo, capture_output=True, timeout=120,
+                )
+                return local_repo
+
+            # 首次 clone
+            os.makedirs(os.path.dirname(local_repo), exist_ok=True)
+            logger.info("克隆仓库: %s → %s", repo, local_repo)
+            result = subprocess.run(
+                ["git", "clone", "--no-checkout", repo, local_repo],
+                capture_output=True, text=True, timeout=300,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(f"git clone 失败: {result.stderr.strip()}")
+            return local_repo
+
+        # 本地路径
+        if not os.path.isdir(repo):
+            raise RuntimeError(f"仓库路径不存在: {repo}")
+        return repo
+
+    def _is_git_repo(self, path: str) -> bool:
+        """判断路径是否为 git 仓库"""
+        return os.path.isdir(os.path.join(path, ".git"))
+
+    def setup_code(self, session_id: str, service_id: str, repo: str,
+                   version: str = None, sub_path: str = None,
+                   versions_map: dict = None) -> str:
+        """加载服务代码到 session，支持 git worktree / 普通目录复制。返回代码路径。
+
+        Args:
+            repo: 仓库路径（本地路径或远程 URL）
+            version: 版本（branch/tag/commit hash/版本别名）
+            sub_path: monorepo 子路径
+            versions_map: 版本别名映射，如 {"v2.3.1": "abc1234", "生产环境": "def5678"}
+        """
         meta = self.get_meta(session_id)
         worktrees = meta.get("worktrees", {})
+
+        # 解析版本别名
+        resolved_version = version
+        if version and versions_map and version in versions_map:
+            resolved_version = versions_map[version]
+
+        effective_version = resolved_version or "HEAD"
 
         # 已存在且版本相同则复用
         if service_id in worktrees:
             existing = worktrees[service_id]
-            if existing.get("version") == (version or "HEAD"):
+            if existing.get("version") == effective_version:
                 code_path = existing["path"]
                 if sub_path:
                     code_path = os.path.join(code_path, sub_path)
@@ -121,33 +175,51 @@ class SessionManager:
 
         wt_path = os.path.join(self.worktree_base, session_id, service_id)
 
-        # 移除旧 worktree
+        # 清理旧目录
         if os.path.isdir(wt_path):
-            try:
-                subprocess.run(
-                    ["git", "worktree", "remove", "--force", wt_path],
-                    cwd=repo, capture_output=True, timeout=30,
-                )
-            except Exception:
-                shutil.rmtree(wt_path, ignore_errors=True)
+            # 尝试 git worktree remove
+            old_info = worktrees.get(service_id, {})
+            old_repo = old_info.get("repo", "")
+            if old_repo and self._is_git_repo(old_repo):
+                try:
+                    subprocess.run(
+                        ["git", "worktree", "remove", "--force", wt_path],
+                        cwd=old_repo, capture_output=True, timeout=30,
+                    )
+                except Exception:
+                    pass
+            shutil.rmtree(wt_path, ignore_errors=True)
 
         os.makedirs(os.path.dirname(wt_path), exist_ok=True)
 
-        ref = version or "HEAD"
-        try:
-            result = subprocess.run(
-                ["git", "worktree", "add", "--detach", wt_path, ref],
-                cwd=repo, capture_output=True, text=True, timeout=60,
-            )
-            if result.returncode != 0:
-                raise RuntimeError(f"git worktree add 失败: {result.stderr.strip()}")
-        except subprocess.TimeoutExpired:
-            raise RuntimeError("git worktree add 超时")
+        # 确保 repo 在本地
+        local_repo = self._ensure_local_repo(repo)
+
+        if self._is_git_repo(local_repo):
+            # git 仓库：用 worktree
+            ref = resolved_version or "HEAD"
+            try:
+                result = subprocess.run(
+                    ["git", "worktree", "add", "--detach", wt_path, ref],
+                    cwd=local_repo, capture_output=True, text=True, timeout=60,
+                )
+                if result.returncode != 0:
+                    raise RuntimeError(f"git worktree add 失败: {result.stderr.strip()}")
+            except subprocess.TimeoutExpired:
+                raise RuntimeError("git worktree add 超时")
+            source_type = "worktree"
+        else:
+            # 非 git 目录：直接复制（或 symlink）
+            shutil.copytree(local_repo, wt_path, dirs_exist_ok=True,
+                            ignore=shutil.ignore_patterns('.git', '__pycache__', 'node_modules'))
+            source_type = "copy"
 
         worktrees[service_id] = {
             "path": wt_path,
-            "repo": repo,
-            "version": version or "HEAD",
+            "repo": local_repo,
+            "version": effective_version,
+            "version_label": version if version != resolved_version else None,
+            "source_type": source_type,
             "created_at": datetime.now().isoformat(),
         }
         meta["worktrees"] = worktrees
@@ -156,7 +228,52 @@ class SessionManager:
         code_path = wt_path
         if sub_path:
             code_path = os.path.join(code_path, sub_path)
-        logger.info("worktree 已创建: %s @ %s → %s", service_id, ref, code_path)
+        logger.info("代码已加载: %s @ %s → %s (%s)", service_id, effective_version, code_path, source_type)
+        return code_path
+
+    def setup_from_upload(self, session_id: str, service_id: str, archive_path: str,
+                          sub_path: str = None) -> str:
+        """从上传的代码压缩包加载服务代码。返回代码路径。"""
+        meta = self.get_meta(session_id)
+        worktrees = meta.get("worktrees", {})
+
+        wt_path = os.path.join(self.worktree_base, session_id, service_id)
+        if os.path.isdir(wt_path):
+            shutil.rmtree(wt_path, ignore_errors=True)
+        os.makedirs(wt_path, exist_ok=True)
+
+        # 解压
+        name_lower = archive_path.lower()
+        if name_lower.endswith('.zip'):
+            with zipfile.ZipFile(archive_path, 'r') as zf:
+                zf.extractall(wt_path)
+        elif name_lower.endswith(('.tar.gz', '.tgz', '.tar')):
+            with tarfile.open(archive_path, 'r:*') as tf:
+                tf.extractall(wt_path, filter='data')
+        else:
+            raise RuntimeError(f"不支持的压缩格式: {archive_path}")
+
+        # 如果解压后只有一个顶层目录，进入该目录
+        entries = os.listdir(wt_path)
+        if len(entries) == 1 and os.path.isdir(os.path.join(wt_path, entries[0])):
+            actual_path = os.path.join(wt_path, entries[0])
+        else:
+            actual_path = wt_path
+
+        worktrees[service_id] = {
+            "path": actual_path,
+            "repo": archive_path,
+            "version": "uploaded",
+            "source_type": "upload",
+            "created_at": datetime.now().isoformat(),
+        }
+        meta["worktrees"] = worktrees
+        self.save_meta(session_id, meta)
+
+        code_path = actual_path
+        if sub_path:
+            code_path = os.path.join(code_path, sub_path)
+        logger.info("代码已从压缩包加载: %s → %s", service_id, code_path)
         return code_path
 
     def get_loaded_worktrees(self, session_id: str) -> dict:

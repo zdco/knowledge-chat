@@ -391,6 +391,9 @@ def _build_analyzer_prompt(session_id: str = None) -> str:
             parts.append(f"  • {svc.get('name', sid)} ({sid}) [{svc.get('language', '?')}]{deps_str}")
             if svc.get("description"):
                 parts.append(f"    {svc['description']}")
+            versions = svc.get("versions") or {}
+            if versions:
+                parts.append(f"    可用版本: {', '.join(versions.keys())}")
     else:
         parts.append("暂无已注册服务，用户可通过对话添加。")
 
@@ -1259,10 +1262,18 @@ def exec_tool(name: str, inp: dict) -> str:
             else:
                 repo = svc["repo"]
                 sub_path = svc.get("sub_path")
-                code_path = _session_manager.setup_worktree(session_id, service_id, repo, version, sub_path)
+                versions_map = svc.get("versions") or {}
+                code_path = _session_manager.setup_code(
+                    session_id, service_id, repo, version, sub_path, versions_map
+                )
+                version_label = version or "HEAD"
+                if version and versions_map.get(version):
+                    version_label = f"{version} → {versions_map[version]}"
                 output = f"已加载 {svc.get('name', service_id)} 代码到: {code_path}\n"
                 output += f"语言: {svc.get('language', '未知')}\n"
-                output += f"版本: {version or 'HEAD'}\n"
+                output += f"版本: {version_label}\n"
+                if versions_map:
+                    output += f"可用版本别名: {', '.join(versions_map.keys())}\n"
                 output += f"你现在可以用 search 和 read_file 工具查看该服务的代码，路径前缀: {code_path}"
 
         elif name == "list_services" and APP_MODE == "log-analyzer":
@@ -1279,6 +1290,9 @@ def exec_tool(name: str, inp: dict) -> str:
                     lines.append(f"  仓库: {svc.get('repo', '')}")
                     if svc.get("sub_path"):
                         lines.append(f"  子路径: {svc['sub_path']}")
+                    versions = svc.get("versions") or {}
+                    if versions:
+                        lines.append(f"  版本别名: {', '.join(versions.keys())}")
                     lines.append("")
                 output = "\n".join(lines)
 
