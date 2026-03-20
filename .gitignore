@@ -25,3 +25,4 @@ knowledge/*/*.zip
 
 # Oracle Instant Client（自动下载，不提交）
 oracle_client/
+.vscode/
