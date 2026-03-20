@@ -12,43 +12,20 @@ services:
   #   description: "接收交易所行情数据并分发"
 
   # ── 示例 2：不同客户对应不同 git 仓库 ──────────
-  # 同一个服务，因为 git 迁移过，不同客户的代码在不同仓库
   # trade_engine:
   #   name: "交易引擎"
   #   repo: "https://new-gitlab.example.com/trading/engine.git"   # 默认仓库（最新）
   #   language: "C++"
   #   depends_on: [risk_control, market_gateway]
   #   description: "核心交易撮合引擎"
-  #   versions:
-  #     # 简写：版本别名 → git ref（使用默认 repo）
-  #     v3.0.0: "release/3.0.0"
-  #     latest: "main"
-  #
-  #     # 完整格式：版本别名 → {repo, ref, sub_path}
-  #     # 客户A 还在用老 gitlab 上的代码
-  #     客户A-v2.3.1:
-  #       repo: "https://old-gitlab.example.com/legacy/trade-engine.git"
-  #       ref: "abc1234def5678"
-  #
-  #     # 客户B 用的是迁移前的另一个仓库
-  #     客户B-v2.5.0:
-  #       repo: "git@internal-git:trading/engine-v2.git"
-  #       ref: "release/2.5.0"
-  #
-  #     # 客户C 给了一份代码目录（非 git）
-  #     客户C-v1.8:
+  #   client_repos:
+  #     客户A: "https://old-gitlab.example.com/legacy/trade-engine.git"
+  #     客户B: "git@internal-git:trading/engine-v2.git"
+  #     客户C:
   #       repo: "/data/customer_code/clientC/trade_engine"
-  #       ref: "HEAD"
+  #       sub_path: "src"
 
-  # ── 示例 3：远程 git 仓库（自动 clone）─────────
-  # auth_service:
-  #   name: "认证服务"
-  #   repo: "https://gitlab.example.com/backend/auth.git"
-  #   language: "Java"
-  #   depends_on: []
-  #   description: "用户认证和权限管理"
-
-  # ── 示例 4：monorepo 子路径 ────────────────────
+  # ── 示例 3：monorepo 子路径 ────────────────────
   # data_server:
   #   name: "数据服务"
   #   repo: "/data/repos/monorepo"
@@ -56,32 +33,27 @@ services:
   #   language: "Java"
   #   depends_on: [database]
   #   description: "数据存储和查询服务"
-  #   versions:
-  #     # monorepo 中不同客户可能子路径也不同
-  #     客户A-v1.0:
-  #       ref: "abc1234"
-  #       sub_path: "modules/data_server"    # 老版本目录结构不同
 
-  # ── 示例 5：非 git 目录 ────────────────────────
-  # legacy_system:
-  #   name: "老系统"
-  #   repo: "/data/customer/legacy_code"
-  #   language: "C"
+  # ── 示例 4：远程 git 仓库（自动 clone）─────────
+  # auth_service:
+  #   name: "认证服务"
+  #   repo: "https://gitlab.example.com/backend/auth.git"
+  #   language: "Java"
   #   depends_on: []
-  #   description: "客户提供的老版本代码，无 git 历史"
+  #   description: "用户认证和权限管理"
 
 # ── 配置说明 ──────────────────────────────────────
 #
 # repo 支持三种格式：
-#   1. 本地 git 仓库路径（如 /data/repos/xxx）
-#   2. 远程 git URL（如 https://... 或 git@...），首次使用时自动 clone
-#   3. 本地普通目录（非 git），会复制到 session 隔离目录
+#   1. 本地 git 仓库路径
+#   2. 远程 git URL（首次使用自动 clone）
+#   3. 本地普通目录（非 git，自动复制）
 #
-# versions 字段支持两种格式：
-#   简写：  版本别名: "git-ref"           → 使用服务默认的 repo
-#   完整：  版本别名:                      → 可覆盖 repo、ref、sub_path
-#             repo: "另一个仓库地址"
-#             ref: "commit-hash"
-#             sub_path: "子路径"
+# client_repos（可选）：不同客户的代码仓库映射
+#   简写：客户名: "仓库地址"
+#   完整：客户名:
+#           repo: "仓库地址"
+#           sub_path: "子路径"
 #
-# 用户也可以在对话中直接上传代码压缩包，无需在此配置
+# 版本号不需要在配置中写死，用户在对话中提供即可
+# AI 会用 switch_service(service="xxx", version="v2.3.1", client="客户A") 加载代码

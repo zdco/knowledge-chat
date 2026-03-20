@@ -149,37 +149,35 @@ class SessionManager:
 
     def setup_code(self, session_id: str, service_id: str, repo: str,
                    version: str = None, sub_path: str = None,
-                   versions_map: dict = None) -> str:
+                   client: str = None, client_repos: dict = None) -> str:
         """加载服务代码到 session，支持 git worktree / 普通目录复制。返回代码路径。
 
         Args:
             repo: 默认仓库路径（本地路径或远程 URL）
-            version: 版本（branch/tag/commit hash/版本别名）
+            version: 版本（branch/tag/commit hash），由用户在对话中提供，默认 HEAD
             sub_path: 默认 monorepo 子路径
-            versions_map: 版本别名映射，支持两种格式：
-                简写: {"v2.3.1": "abc1234"}
-                完整: {"客户A-v2.3.1": {"repo": "git@old-gitlab:xxx.git", "ref": "abc1234", "sub_path": "src"}}
+            client: 客户名（可选），用于查找客户专属仓库
+            client_repos: 客户仓库映射，如：
+                {"客户A": {"repo": "git@old-gitlab:xxx.git"}}
+                {"客户B": {"repo": "/data/code/xxx", "sub_path": "src"}}
+                {"客户C": "git@another:xxx.git"}  # 简写，只有 repo
         """
         meta = self.get_meta(session_id)
         worktrees = meta.get("worktrees", {})
 
-        # 解析版本别名 — 可能覆盖 repo 和 sub_path
+        # 根据客户名查找对应仓库
         actual_repo = repo
         actual_sub_path = sub_path
-        resolved_version = version
-        if version and versions_map and version in versions_map:
-            v = versions_map[version]
-            if isinstance(v, dict):
-                # 完整格式：可覆盖 repo、ref、sub_path
-                actual_repo = v.get("repo", repo)
-                resolved_version = v.get("ref", version)
-                actual_sub_path = v.get("sub_path", sub_path)
+        if client and client_repos and client in client_repos:
+            cr = client_repos[client]
+            if isinstance(cr, dict):
+                actual_repo = cr.get("repo", repo)
+                actual_sub_path = cr.get("sub_path", sub_path)
             else:
-                # 简写格式：值就是 git ref
-                resolved_version = v
+                # 简写：值就是 repo 地址
+                actual_repo = cr
 
-        effective_version = resolved_version or "HEAD"
-        # 用 repo+version 组合作为缓存 key，避免不同 repo 的同名版本冲突
+        effective_version = version or "HEAD"
         cache_key = f"{actual_repo}@{effective_version}"
 
         # 已存在且版本相同则复用
@@ -242,7 +240,7 @@ class SessionManager:
             "path": wt_path,
             "repo": local_repo,
             "version": effective_version,
-            "version_label": version if version != resolved_version else None,
+            "client": client,
             "source_type": source_type,
             "_cache_key": cache_key,
             "created_at": datetime.now().isoformat(),

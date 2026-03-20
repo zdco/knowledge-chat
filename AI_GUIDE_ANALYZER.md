@@ -33,7 +33,7 @@
 - **编程语言**：自动识别结果
 - **依赖服务**：上下游服务列表
 - **服务描述**：一句话说明服务职责
-- **版本映射**（可选）：客户环境的版本号对应的 git commit/tag
+- **客户仓库**（可选）：如果不同客户的代码在不同仓库，询问客户名和对应仓库地址
 
 ### 第三步：写入 services.yaml
 
@@ -43,14 +43,17 @@
 services:
   <service_id>:
     name: "<中文名称>"
-    repo: "<仓库路径或远程URL>"
+    repo: "<默认仓库路径或远程URL>"
     sub_path: "<子路径>"          # 仅 monorepo 需要，否则省略
     language: "<语言>"
     depends_on: [<依赖服务ID列表>]
     description: "<服务描述>"
-    versions:                     # 可选：版本别名映射
-      v2.3.1: "abc1234"          # 客户版本号 → git commit hash
-      生产环境: "release/2.0"     # 中文别名也可以
+    client_repos:                 # 可选：不同客户的仓库地址
+      客户A: "https://old-gitlab.example.com/xxx.git"
+      客户B: "git@another-git:xxx.git"
+      客户C:
+        repo: "/data/customer_code/xxx"
+        sub_path: "src"           # 该客户的子路径不同时才需要
 ```
 
 ### 第四步：验证
@@ -77,7 +80,7 @@ repo: "https://gitlab.example.com/backend/auth.git"
 repo: "git@gitlab.example.com:backend/auth.git"
 ```
 
-首次使用时自动 clone 到本地（`--no-checkout`，只下载 git 对象，不占用额外空间）。后续使用自动 fetch 更新。
+首次使用时自动 clone 到本地。后续使用自动 fetch 更新。submodule 会自动拉取。
 
 ### 3. 本地普通目录（非 git）
 
@@ -87,66 +90,39 @@ repo: "/data/customer/legacy_code"
 
 适用于客户提供的代码包解压后的目录，没有 git 历史。加载时会复制到 session 隔离目录。
 
-## 版本映射（versions）
+## 客户仓库映射（client_repos）
 
-versions 支持两种格式：
-
-### 简写格式：版本别名 → git ref
-
-当所有客户的代码都在同一个仓库时使用：
+同一个服务，不同客户的代码可能在不同的 git 仓库（常见于仓库迁移过的场景）。用 `client_repos` 配置客户名到仓库的映射：
 
 ```yaml
-versions:
-  v2.3.1: "abc1234def5678"     # 版本号 → commit hash
-  v2.2.0: "release/2.2.0"     # 版本号 → 分支名
+trade_engine:
+  name: "交易引擎"
+  repo: "https://new-gitlab.example.com/trading/engine.git"   # 标准仓库
+  language: "C++"
+  description: "核心交易撮合引擎"
+  client_repos:
+    # 简写：客户名 → 仓库地址
+    客户A: "https://old-gitlab.example.com/legacy/trade-engine.git"
+    客户B: "git@internal-git:trading/engine-v2.git"
+
+    # 完整格式：客户名 → {repo, sub_path}
+    客户C:
+      repo: "/data/customer_code/clientC/trade_engine"
+      sub_path: "src"    # 该客户的目录结构不同
 ```
 
-### 完整格式：版本别名 → {repo, ref, sub_path}
-
-当不同客户的代码在不同仓库时使用（常见于 git 仓库迁移过的场景）：
-
-```yaml
-versions:
-  # 新客户用最新仓库
-  v3.0.0: "release/3.0.0"
-
-  # 客户A 还在用老 gitlab 上的代码
-  客户A-v2.3.1:
-    repo: "https://old-gitlab.example.com/legacy/trade-engine.git"
-    ref: "abc1234def5678"
-
-  # 客户B 用的是迁移前的另一个仓库
-  客户B-v2.5.0:
-    repo: "git@internal-git:trading/engine-v2.git"
-    ref: "release/2.5.0"
-
-  # 客户C 给了一份代码目录（非 git）
-  客户C-v1.8:
-    repo: "/data/customer_code/clientC/trade_engine"
-    ref: "HEAD"
-
-  # monorepo 中老版本目录结构不同
-  客户D-v1.0:
-    ref: "abc1234"
-    sub_path: "modules/data_server"    # 覆盖默认 sub_path
+**使用方式：** 用户在对话中说"客户A的交易引擎 v2.3.1 有问题"，AI 调用：
 ```
+switch_service(service="trade_engine", version="v2.3.1", client="客户A")
+```
+自动从客户A的仓库拉取 v2.3.1 版本代码。
 
-完整格式中，`repo`、`ref`、`sub_path` 都是可选的，未指定的字段使用服务的默认值。
+**版本号不需要在配置中写死**，用户在对话中提供即可。没有指定版本时默认加载最新代码。
 
 **典型场景：**
 - git 仓库做过迁移，不同客户的代码在不同的 gitlab 地址
-- 客户跑的是很老的版本，当前仓库里已经没有对应的分支
-- 客户的版本号和 git tag 命名规则不一致
-- monorepo 重构过目录结构，老版本的子路径和新版本不同
-- 需要同时对比多个客户的不同版本
-
-**如何获取 commit hash：**
-- 让用户提供部署时的版本信息（构建号、commit hash）
-- 或者根据用户提供的版本发布时间，用 `git log --before="2025-01-01"` 定位
-
-**版本别名命名建议：**
-- 包含客户标识和版本号，如 `客户A-v2.3.1`、`华泰-v2.5.0`
-- AI 在对话中会根据用户提到的客户名自动匹配对应的版本别名
+- 某些客户的代码是离线提供的，放在本地目录
+- monorepo 重构过目录结构，某些客户的子路径不同
 
 ## 用户上传代码压缩包
 

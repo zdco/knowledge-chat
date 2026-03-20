@@ -391,9 +391,9 @@ def _build_analyzer_prompt(session_id: str = None) -> str:
             parts.append(f"  • {svc.get('name', sid)} ({sid}) [{svc.get('language', '?')}]{deps_str}")
             if svc.get("description"):
                 parts.append(f"    {svc['description']}")
-            versions = svc.get("versions") or {}
-            if versions:
-                parts.append(f"    可用版本: {', '.join(versions.keys())}")
+            client_repos = svc.get("client_repos") or {}
+            if client_repos:
+                parts.append(f"    已配置客户: {', '.join(client_repos.keys())}（用户提到客户名时，用 switch_service 的 client 参数指定）")
     else:
         parts.append("暂无已注册服务，用户可通过对话添加。")
 
@@ -678,12 +678,13 @@ _ANALYZER_TOOLS = [
     },
     {
         "name": "switch_service",
-        "description": "加载服务代码到当前会话，后续可用 search/read_file 查看代码。version 可传分支名、tag、commit hash，也可传 versions 中定义的别名（如客户名+版本号）。",
+        "description": "加载服务代码到当前会话，后续可用 search/read_file 查看代码。如果用户提到了客户名，传 client 参数自动匹配该客户的仓库。",
         "input_schema": {
             "type": "object",
             "properties": {
                 "service": {"type": "string", "description": "服务 ID"},
-                "version": {"type": "string", "description": "版本别名/分支/tag/commit（可选，默认 HEAD）。不同客户可能对应不同版本别名，如 '客户A-v2.3.1'"},
+                "version": {"type": "string", "description": "版本：分支名/tag/commit hash（可选，默认最新代码）"},
+                "client": {"type": "string", "description": "客户名（可选），匹配该客户专属的代码仓库"},
             },
             "required": ["service"],
         },
@@ -1253,6 +1254,7 @@ def exec_tool(name: str, inp: dict) -> str:
         elif name == "switch_service" and APP_MODE == "log-analyzer":
             service_id = inp["service"]
             version = inp.get("version")
+            client = inp.get("client")
             session_id = inp.get("_session_id", "")
             svc = _analyzer_services.get(service_id)
             if not svc:
@@ -1262,18 +1264,21 @@ def exec_tool(name: str, inp: dict) -> str:
             else:
                 repo = svc["repo"]
                 sub_path = svc.get("sub_path")
-                versions_map = svc.get("versions") or {}
+                client_repos = svc.get("client_repos") or {}
                 code_path = _session_manager.setup_code(
-                    session_id, service_id, repo, version, sub_path, versions_map
+                    session_id, service_id, repo, version, sub_path,
+                    client=client, client_repos=client_repos,
                 )
-                version_label = version or "HEAD"
-                if version and versions_map.get(version):
-                    version_label = f"{version} → {versions_map[version]}"
                 output = f"已加载 {svc.get('name', service_id)} 代码到: {code_path}\n"
                 output += f"语言: {svc.get('language', '未知')}\n"
-                output += f"版本: {version_label}\n"
-                if versions_map:
-                    output += f"可用版本别名: {', '.join(versions_map.keys())}\n"
+                output += f"版本: {version or '最新'}\n"
+                if client:
+                    used_repo = client_repos.get(client, repo)
+                    if isinstance(used_repo, dict):
+                        used_repo = used_repo.get("repo", repo)
+                    output += f"客户: {client}（仓库: {used_repo}）\n"
+                if client_repos:
+                    output += f"已配置客户: {', '.join(client_repos.keys())}\n"
                 output += f"你现在可以用 search 和 read_file 工具查看该服务的代码，路径前缀: {code_path}"
 
         elif name == "list_services" and APP_MODE == "log-analyzer":
@@ -1287,12 +1292,12 @@ def exec_tool(name: str, inp: dict) -> str:
                     lines.append(f"• {svc.get('name', sid)} ({sid})")
                     lines.append(f"  语言: {svc.get('language', '未知')} | {deps_str}")
                     lines.append(f"  {svc.get('description', '')}")
-                    lines.append(f"  仓库: {svc.get('repo', '')}")
+                    lines.append(f"  默认仓库: {svc.get('repo', '')}")
                     if svc.get("sub_path"):
                         lines.append(f"  子路径: {svc['sub_path']}")
-                    versions = svc.get("versions") or {}
-                    if versions:
-                        lines.append(f"  版本别名: {', '.join(versions.keys())}")
+                    client_repos = svc.get("client_repos") or {}
+                    if client_repos:
+                        lines.append(f"  已配置客户: {', '.join(client_repos.keys())}")
                     lines.append("")
                 output = "\n".join(lines)
 
