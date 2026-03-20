@@ -70,6 +70,22 @@ if APP_MODE == "log-analyzer":
     _session_manager.cleanup_expired()
 
 
+def _find_service(name: str) -> tuple[str, dict] | tuple[None, None]:
+    """按 ID 或别名查找服务，返回 (service_id, service_config) 或 (None, None)"""
+    if not _analyzer_services:
+        return None, None
+    # 先精确匹配 ID
+    if name in _analyzer_services:
+        return name, _analyzer_services[name]
+    # 再匹配别名（不区分大小写）
+    name_lower = name.lower()
+    for sid, svc in _analyzer_services.items():
+        for alias in (svc.get("aliases") or []):
+            if alias.lower() == name_lower:
+                return sid, svc
+    return None, None
+
+
 # ── Oracle Client 自动安装 ────────────────────────────────
 
 def _ensure_oracle_client() -> str:
@@ -388,7 +404,9 @@ def _build_analyzer_prompt(session_id: str = None) -> str:
         for sid, svc in _analyzer_services.items():
             deps = svc.get("depends_on") or []
             deps_str = f" → 依赖: {', '.join(deps)}" if deps else ""
-            parts.append(f"  • {svc.get('name', sid)} ({sid}) [{svc.get('language', '?')}]{deps_str}")
+            aliases = svc.get("aliases") or []
+            alias_str = f" (别名: {', '.join(aliases)})" if aliases else ""
+            parts.append(f"  • {svc.get('name', sid)} ({sid}){alias_str} [{svc.get('language', '?')}]{deps_str}")
             if svc.get("description"):
                 parts.append(f"    {svc['description']}")
             client_repos = svc.get("client_repos") or {}
@@ -1231,6 +1249,10 @@ def exec_tool(name: str, inp: dict) -> str:
 
         elif name == "trace_dependency" and APP_MODE == "log-analyzer":
             service_id = inp["service"]
+            # 支持别名查找
+            resolved_id, _ = _find_service(service_id)
+            if resolved_id:
+                service_id = resolved_id
             depth = inp.get("depth", 2)
             tree = get_dependency_tree(_analyzer_services, service_id, depth)
             if not tree:
@@ -1256,9 +1278,12 @@ def exec_tool(name: str, inp: dict) -> str:
             version = inp.get("version")
             client = inp.get("client")
             session_id = inp.get("_session_id", "")
-            svc = _analyzer_services.get(service_id)
+            # 支持别名查找
+            resolved_id, svc = _find_service(service_id)
+            if resolved_id:
+                service_id = resolved_id
             if not svc:
-                output = f"未找到服务: {service_id}，请用 list_services 查看已注册服务"
+                output = f"未找到服务: {inp['service']}，请用 list_services 查看已注册服务"
             elif not session_id or not _session_manager:
                 output = "无法加载服务代码：缺少 session 信息"
             else:
@@ -1295,7 +1320,9 @@ def exec_tool(name: str, inp: dict) -> str:
                 for sid, svc in _analyzer_services.items():
                     deps = svc.get("depends_on") or []
                     deps_str = f"依赖: {', '.join(deps)}" if deps else "无依赖"
-                    lines.append(f"• {svc.get('name', sid)} ({sid})")
+                    aliases = svc.get("aliases") or []
+                    alias_str = f" (别名: {', '.join(aliases)})" if aliases else ""
+                    lines.append(f"• {svc.get('name', sid)} ({sid}){alias_str}")
                     lines.append(f"  语言: {svc.get('language', '未知')} | {deps_str}")
                     lines.append(f"  {svc.get('description', '')}")
                     lines.append(f"  默认仓库: {svc.get('repo', '')}")
