@@ -16,6 +16,41 @@ import yaml
 logger = logging.getLogger(__name__)
 
 
+# ── Git URL 解析 ──────────────────────────────────────────
+
+# 匹配 GitLab/GitHub 的 /tree/branch/path 或 /-/tree/branch/path 格式
+_TREE_URL_RE = re.compile(
+    r'^(https?://[^/]+/[^/]+/[^/]+?)(?:/-)?/tree/([^/]+)(?:/(.+?))?/?$'
+)
+
+
+def parse_repo_url(url: str) -> tuple[str, str | None, str | None]:
+    """解析 git 仓库 URL，自动提取分支和子路径。
+
+    支持格式：
+      http://gitlab.example.com/group/project/tree/dev/some/path
+      http://gitlab.example.com/group/project/-/tree/dev/some/path
+      http://gitlab.example.com/group/project.git
+      git@gitlab.example.com:group/project.git
+
+    Returns:
+        (repo_url, branch, sub_path)
+        branch 和 sub_path 可能为 None
+    """
+    if not url:
+        return url, None, None
+
+    m = _TREE_URL_RE.match(url.strip())
+    if m:
+        repo_url = m.group(1) + ".git"
+        branch = m.group(2)
+        sub_path = m.group(3) or None
+        return repo_url, branch, sub_path
+
+    # 普通 URL 或本地路径，原样返回
+    return url, None, None
+
+
 # ── 服务注册表 ────────────────────────────────────────────
 
 def load_services_config(config_path: str) -> dict:
@@ -176,6 +211,14 @@ class SessionManager:
             else:
                 # 简写：值就是 repo 地址
                 actual_repo = cr
+
+        # 解析 URL 中的分支和子路径（如 gitlab /tree/dev/some/path）
+        parsed_repo, parsed_branch, parsed_sub_path = parse_repo_url(actual_repo)
+        actual_repo = parsed_repo
+        if parsed_branch and not version:
+            version = parsed_branch
+        if parsed_sub_path and not actual_sub_path:
+            actual_sub_path = parsed_sub_path
 
         effective_version = version or "HEAD"
         cache_key = f"{actual_repo}@{effective_version}"

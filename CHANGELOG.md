@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 服务注册表（services.yaml）：定义微服务名称、仓库路径、语言、依赖关系，支持 AI 通过对话自动生成
 - services.yaml `repo` 支持三种格式：本地 git 仓库、远程 git URL（自动 clone）、本地普通目录（自动复制）
 - services.yaml `client_repos` 字段：不同客户映射到不同仓库地址，AI 根据用户提到的客户名自动匹配
+- 自动解析 GitLab/GitHub 仓库 URL 中的分支和子路径（如 `/tree/dev/DbQueryServer` → 分支 dev、子路径 DbQueryServer）
 - 支持用户上传代码压缩包作为代码来源（`setup_from_upload`），自动解压到 session 隔离目录
 - AI_GUIDE_ANALYZER.md：服务注册指南，AI 按指南自动扫描代码仓库并生成 services.yaml 配置
 - log_analyzer.py：SessionManager 管理分析会话（创建/清理/过期回收）、git worktree 版本隔离、文件上传处理（zip/tar.gz 自动解压）、日志预处理（ERROR 摘要提取、按级别/关键词/时间范围过滤）
