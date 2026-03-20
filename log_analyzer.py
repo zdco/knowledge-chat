@@ -122,7 +122,7 @@ class SessionManager:
                 )
                 return local_repo
 
-            # 首次 clone
+            # 首次 clone（含 submodule）
             os.makedirs(os.path.dirname(local_repo), exist_ok=True)
             logger.info("克隆仓库: %s → %s", repo, local_repo)
             result = subprocess.run(
@@ -131,6 +131,11 @@ class SessionManager:
             )
             if result.returncode != 0:
                 raise RuntimeError(f"git clone 失败: {result.stderr.strip()}")
+            # 初始化 submodule 配置（不 checkout，只注册）
+            subprocess.run(
+                ["git", "submodule", "init"],
+                cwd=local_repo, capture_output=True, timeout=60,
+            )
             return local_repo
 
         # 本地路径
@@ -221,6 +226,11 @@ class SessionManager:
                     raise RuntimeError(f"git worktree add 失败: {result.stderr.strip()}")
             except subprocess.TimeoutExpired:
                 raise RuntimeError("git worktree add 超时")
+            # 初始化并拉取 submodule（如果有）
+            subprocess.run(
+                ["git", "submodule", "update", "--init", "--recursive"],
+                cwd=wt_path, capture_output=True, timeout=300,
+            )
             source_type = "worktree"
         else:
             # 非 git 目录：直接复制（或 symlink）
