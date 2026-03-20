@@ -1269,9 +1269,15 @@ def exec_tool(name: str, inp: dict) -> str:
                     session_id, service_id, repo, version, sub_path,
                     client=client, client_repos=client_repos,
                 )
+                # 获取实际的 sub_path（可能由 URL 解析或 client_repos 覆盖）
+                loaded_wt = _session_manager.get_loaded_worktrees(session_id).get(service_id, {})
+                actual_sub = loaded_wt.get("sub_path")
                 output = f"已加载 {svc.get('name', service_id)} 代码到: {code_path}\n"
                 output += f"语言: {svc.get('language', '未知')}\n"
                 output += f"版本: {version or '最新'}\n"
+                if actual_sub:
+                    output += f"该服务主代码目录: {code_path}/{actual_sub}\n"
+                    output += f"仓库根目录: {code_path}（可搜索整个仓库，包括公共库等其他目录）\n"
                 if client:
                     used_repo = client_repos.get(client, repo)
                     if isinstance(used_repo, dict):
@@ -1279,7 +1285,7 @@ def exec_tool(name: str, inp: dict) -> str:
                     output += f"客户: {client}（仓库: {used_repo}）\n"
                 if client_repos:
                     output += f"已配置客户: {', '.join(client_repos.keys())}\n"
-                output += f"你现在可以用 search 和 read_file 工具查看该服务的代码，路径前缀: {code_path}"
+                output += f"你现在可以用 search 和 read_file 工具查看代码，路径前缀: {code_path}"
 
         elif name == "list_services" and APP_MODE == "log-analyzer":
             if not _analyzer_services:

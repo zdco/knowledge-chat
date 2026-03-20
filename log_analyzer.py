@@ -282,6 +282,7 @@ class SessionManager:
 
         worktrees[service_id] = {
             "path": wt_path,
+            "sub_path": actual_sub_path,
             "repo": local_repo,
             "version": effective_version,
             "client": client,
@@ -292,11 +293,11 @@ class SessionManager:
         meta["worktrees"] = worktrees
         self.save_meta(session_id, meta)
 
-        code_path = wt_path
-        if actual_sub_path:
-            code_path = os.path.join(code_path, actual_sub_path)
-        logger.info("代码已加载: %s @ %s → %s (%s)", service_id, effective_version, code_path, source_type)
-        return code_path
+        # 返回仓库根路径（不拼接 sub_path），让 AI 能搜索整个仓库
+        # sub_path 作为提示信息，告诉 AI 主代码在哪个子目录
+        logger.info("代码已加载: %s @ %s → %s (主目录: %s) (%s)",
+                     service_id, effective_version, wt_path, actual_sub_path or "/", source_type)
+        return wt_path
 
     def setup_from_upload(self, session_id: str, service_id: str, archive_path: str,
                           sub_path: str = None) -> str:
