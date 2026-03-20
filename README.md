@@ -1,86 +1,96 @@
-# 全能 AI 助手
+# knowledge-chat
 
-基于 Agent 模式的知识域 AI 问答平台。一个入口、一个对话框，AI 自动判断问题领域，自主选择工具搜索和回答。
+把团队的代码、文档、配置、数据库变成一个能对话的 AI 助手。问一句话，AI 自己搜代码、翻文档、查数据库，拼出完整答案。
 
-通过 `knowledge/` 目录下的 YAML 文件配置知识域，新增知识域只需添加 YAML 文件，服务自动热加载，无需改代码。
+不是又一个通用 AI Agent 框架。不做邮件、日历、消息自动化。只做一件事：**让团队知识可搜索、可对话、可沉淀**。
 
-## 它解决什么问题
+## 为什么需要它
 
-企业内部有大量知识散落在各处，找一个答案往往比解决问题本身还难：
+企业内部的知识散落在各处，找答案比解决问题本身还难：
 
-**知识分散，找不到**
 - 文档在 Confluence，代码在 GitLab，配置在运维手册，数据库结构在某个人的脑子里
-- 同一个问题的答案可能分布在三四个系统中，拼凑完整信息要翻半天
-- 很多关键知识根本没有文档，只有"问那个人才知道"
+- 新人一个问题要问三个人，老员工每天被重复问题打断
+- 线上出了问题，查日志、查配置、查代码、查数据库，每一步都要切换工具
+- 同样的问题上次有人排查过，但结论没有沉淀，下次还得重来
 
-**沟通成本高，效率低**
-- 新人一个问题要问三个人，每个人只知道一部分
-- 老员工每天被重复问题打断，真正干活的时间被压缩
-- 跨团队协作时，光对齐上下文就要开好几次会
-- 关键人员请假或离职，相关知识直接断档
+**解决思路：把所有知识喂给 AI，让任何人都能用自然语言直接问。**
 
-**排查问题流程长**
-- 线上出了问题，先查日志、再查配置、再查代码、再查数据库，每一步都要切换工具
-- 不熟悉的系统出问题，要先花大量时间理解架构才能开始排查
-- 同样的问题上次有人排查过，但结论没有沉淀，下次还得重来一遍
+## 和 OpenClaw 等通用 Agent 有什么不同
 
-**这个平台的解决思路很简单：把所有知识喂给 AI，让任何人都能用自然语言直接问。**
+[OpenClaw](https://github.com/openclaw/openclaw) 是通用 AI Agent 框架，连接消息平台（WhatsApp/Telegram/Slack），执行各种自动化任务（发邮件、管日历、操作文件）。它解决的是"让 AI 帮你做事"。
 
-- 源码、文档、配置、数据库结构 → 统一放进知识域
-- AI 自主搜索、读文件、查数据库 → 自动拼凑完整答案
-- AI 学习记忆 → 排查过的问题自动沉淀，下次直接复用
-- 一个对话框 → 替代翻 Confluence、翻代码、问同事的全部流程
+knowledge-chat 解决的是完全不同的问题：**让 AI 帮你找答案**。
+
+| | knowledge-chat | OpenClaw 等通用 Agent |
+|---|---|---|
+| **定位** | 团队知识问答 + 日志分析 | 通用任务自动化 |
+| **数据源** | 你的代码、文档、配置、数据库 | 邮件、日历、消息、网页 |
+| **核心能力** | 搜索代码、读文件、查数据库、分析日志 | 发消息、管文件、调 API、操作系统 |
+| **部署方式** | 一个 Python 文件，改个 YAML 就能用 | 需要配置消息渠道、Skills、安全策略 |
+| **上手成本** | 把资料丢进目录，写几行 YAML | 需要理解 Skills 体系、Channel 配置 |
+| **知识沉淀** | AI 自动记忆有价值的结论，越用越聪明 | 无内置知识沉淀机制 |
+| **适用场景** | 开发团队内部知识共享、故障排查 | 个人效率工具、跨平台自动化 |
+
+简单说：OpenClaw 是你的私人助理，knowledge-chat 是你团队的技术大脑。
+
+## 两种模式
+
+### 知识域问答（默认）
+
+把源码、文档、配置、数据库连接信息组织成"知识域"，AI 自动判断问题领域，搜索对应资料回答。
+
+```
+用户：交易网关的超时重试机制是怎么实现的？
+AI：[搜索代码] [读取 RetryHandler.cpp] [搜索配置]
+    超时重试在 RetryHandler.cpp:45 实现，采用指数退避策略...
+```
+
+### 日志分析
+
+切换 `mode: log-analyzer`，变身故障排查助手。注册微服务信息后，AI 能分析日志、读源码、追踪依赖链，定位问题根因。
+
+```
+用户：行情网关今天下午 3 点开始数据延迟 [拖入 gateway.log.zip]
+AI：[解压日志] [read_log: 发现 15 条 ERROR，集中在 15:02-15:05]
+    [switch_service: 加载行情网关代码 v2.3.1]
+    [search: 定位到 Decoder.cpp:234 解码超时]
+    [trace_dependency: 行情网关 → data_server]
+
+    初步分析：解码模块在 15:02 开始出现超时，根因是...
+    需要确认：data_server 同时间段是否有异常？
+```
+
+支持拖拽上传日志、Ctrl+V 粘贴截图、压缩包自动解压。多人并发使用时通过 git worktree 隔离代码版本。
 
 ## 功能特性
 
-- **Agent 模式多工具调用** — AI 自主选择搜索、读文件、执行代码等工具，多轮迭代直到找到答案
-- **知识域热加载** — 新增或修改 `domain.yaml` 后自动生效，无需重启服务
-- **AI 学习记忆** — AI 将有价值的结论写入 memory 笔记，后续通过搜索复用，实现自我进化
-- **对话分享** — 一键生成固定链接，对方打开即可只读查看完整对话
-- **日志分析模式** — 切换 `mode: log-analyzer` 后变身日志分析助手，支持服务注册、日志过滤、依赖链追踪、git worktree 代码版本隔离
-- **文件上传** — 拖拽/粘贴/点击上传日志文件、压缩包、截图，压缩包自动解压，截图作为多模态图片发送给 AI
-- **Confluence 自动转换** — 配置 `confluence_zip` 字段后，启动时自动将 Confluence HTML 导出包转为 Markdown
-- **多 API 格式兼容** — 同时支持 Anthropic 和 OpenAI API 格式，根据 `base_url` 自动检测或手动指定
-- **完整日志** — console + 文件双输出，按天轮转，每条日志携带 request_id 可追踪全链路
+- **Agent 多工具调用** — AI 自主选择搜索、读文件、执行代码等工具，多轮迭代直到找到答案
+- **知识域热加载** — 新增或修改 YAML 后自动生效，无需重启
+- **AI 学习记忆** — 有价值的结论自动沉淀到 memory，后续搜索复用，越用越聪明
+- **日志分析** — 日志过滤、依赖链追踪、git worktree 代码版本隔离、多模态截图识别
+- **文件上传** — 拖拽/粘贴/点击上传日志、压缩包、截图
+- **对话分享** — 一键生成链接，对方打开即可查看完整对话
+- **Confluence 导入** — 自动将 Confluence 导出包转为可搜索的 Markdown
+- **数据库查询** — AI 自动生成 Python 代码查询 MySQL/Oracle
+- **多模型兼容** — 支持 Claude、GPT、GLM、MiniMax 等，Anthropic/OpenAI 双格式
 
 ## 快速启动
 
-### 使用启动脚本（推荐）
-
 ```bash
-./start.sh      # 前台运行
-./start.sh -d   # 后台运行（日志输出到 output.log）
-```
+# 方式一：启动脚本（自动创建虚拟环境、安装依赖）
+./start.sh
 
-`start.sh` 会自动创建虚拟环境、安装依赖并启动服务。
-
-### 手动安装
-
-要求 Python 3.10+
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
+# 方式二：手动
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-export AI_CHAT_API_KEY="your-token"
+export AI_CHAT_API_KEY="your-key"
 python app.py
-```
 
-打开 http://localhost:5001/kchat/chat
-
-### Docker 运行
-
-```bash
+# 方式三：Docker
 docker-compose up -d
 ```
 
-环境变量说明：
-
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `AI_CHAT_API_KEY` | API 密钥（必填） | — |
-| `AI_CHAT_BASE_URL` | API 代理地址 | `http://coding.whup.com/` |
-| `AI_CHAT_MODEL` | 模型名称（覆盖 config.yaml） | — |
+打开 http://localhost:5001/kchat/chat
 
 ## 配置
 
@@ -91,131 +101,108 @@ docker-compose up -d
 mode: knowledge
 
 api:
-  # 代理地址（含 /v1 自动走 OpenAI 格式，否则走 Anthropic 格式）
-  base_url: "http://coding.whup.com/v1"
-  api_key: ""                            # 密钥（环境变量 AI_CHAT_API_KEY 优先）
-  model: "MiniMax-M2.5"                  # 模型名称
-  max_tokens: 4096                       # 单次回复最大 token
-  max_iterations: 50                     # Agent 最大工具调用轮数
-  # API 格式："anthropic" 或 "openai"，不设置则根据 base_url 是否含 /v1 自动判断
-  # 非 Claude 模型建议用 openai 格式
-  # api_format: "openai"
+  base_url: "https://api.example.com/v1"   # API 地址
+  api_key: ""                               # 密钥（环境变量 AI_CHAT_API_KEY 优先）
+  model: "claude-sonnet-4-20250514"         # 模型
+  max_tokens: 4096
+  max_iterations: 50
 
 server:
   host: "0.0.0.0"
   port: 5001
+  title: "全能 AI 助手"
 
 tools:
-  max_output_length: 15000               # 工具结果最大字符数
-  max_display_length: 2000               # 前端展示的工具结果最大字符数
-  python_timeout: 300                    # run_python 超时时间（秒）
+  max_output_length: 15000
+  max_display_length: 2000
+  python_timeout: 300
 
 logging:
   level: "INFO"
   file: "logs/app.log"
   backup_days: 30
 
-# 日志分析模式专用配置（仅 mode: log-analyzer 时生效）
+# 日志分析模式专用（仅 mode: log-analyzer 时生效）
 analyzer:
-  services_config: "services.yaml"       # 服务注册表路径
-  session_dir: "/data/sessions"          # session 数据目录
-  worktree_base: "/data/worktrees"       # git worktree 根目录
-  session_ttl: 86400                     # session 过期时间（秒）
-  max_upload_size: 104857600             # 最大上传文件大小（100MB）
+  services_config: "services.yaml"
+  session_dir: "/data/sessions"
+  worktree_base: "/data/worktrees"
+  session_ttl: 86400
+  max_upload_size: 104857600
 ```
 
-### 切换模型
+环境变量（优先于 config.yaml）：
 
-编辑 `config.yaml` 中的 `api.model`，或通过环境变量覆盖：
-
-```bash
-export AI_CHAT_MODEL="claude-haiku-4-5-20251001"
-```
-
-| 模型 | 说明 |
+| 变量 | 说明 |
 |------|------|
-| `claude-sonnet-4-5-20250929` | 推荐，性价比高 |
-| `claude-sonnet-4-6` | 最新 sonnet |
-| `claude-haiku-4-5-20251001` | 最快，适合简单问题 |
-| `claude-opus-4-5-20251101` | 最强，适合复杂分析 |
-
-优先级：环境变量 > config.yaml
-
-### API 格式
-
-支持两种 API 格式：
-
-- **Anthropic 格式** — 适用于 Claude 系列模型
-- **OpenAI 格式** — 适用于 GLM、MiniMax 等第三方模型
-
-自动检测逻辑：`base_url` 包含 `/v1` 时自动使用 OpenAI 格式，否则使用 Anthropic 格式。也可通过 `api_format` 手动指定。
+| `AI_CHAT_API_KEY` | API 密钥 |
+| `AI_CHAT_BASE_URL` | API 地址 |
+| `AI_CHAT_MODEL` | 模型名称 |
 
 ## 新增知识域
 
-### 手动创建
+### 方式一：让 AI 自动生成
 
-1. 拷贝 `knowledge/_template/` 目录，重命名为知识域英文名（如 `knowledge/my_domain/`）
-2. 将相关资料（源码、文档、配置等）拷贝到 `data/` 下
-3. 编辑 `domain.yaml`，填写名称、描述、prompt 等字段
-4. 服务自动热加载生效
-
-支持 Confluence 导出包：在 `domain.yaml` 中配置 `confluence_zip` 字段指向 ZIP 文件路径，服务启动时自动转换为 Markdown。
-
-支持数据库查询：在 `domain.yaml` 中配置 `databases` 字段，AI 可自动生成 Python 代码查询数据库。
-
-### 用 AI 自动生成
-
-项目提供了 `AI_GUIDE.md`，这是一份 AI 工作指令。将它加载到任意 AI 助手（如 Claude、Cursor、Kiro 等）的上下文中，然后告诉 AI 你的源码/文档路径，AI 会自动完成：
-
-1. 扫描分析文件内容和结构
-2. 将所有资料整理拷贝到 `data/` 目录
-3. 生成 `domain.yaml` 配置（包含 prompt 和示例问题）
-
-使用方式：
+项目提供了 `AI_GUIDE.md` 工作指南，在对话中直接告诉 AI 你的资料路径：
 
 ```
-# 在 AI 助手中加载指南后，直接对话即可
-"帮我用 /path/to/src 和 /path/to/doc 创建一个 xxx 知识域"
+"帮我用 /data/repos/gateway 创建一个行情网关知识域"
 ```
 
-AI 会按照指南中的流程自动创建完整的知识域目录，热加载后即可使用。
+AI 会自动扫描代码结构、整理资料、生成配置，热加载后即可使用。
+
+### 方式二：手动创建
+
+1. 拷贝 `knowledge/_template/` 目录，重命名
+2. 将资料放入 `data/` 目录
+3. 编辑 `domain.yaml` 填写配置
+4. 自动热加载生效
+
+支持 Confluence 导出包（配置 `confluence_zip` 字段）和数据库连接（配置 `databases` 字段）。
+
+## 日志分析模式
+
+将 `mode` 改为 `log-analyzer`，注册微服务信息：
+
+```yaml
+# services.yaml
+services:
+  market_gateway:
+    name: "行情网关"
+    repo: "/data/repos/market_gateway"
+    language: "C++"
+    depends_on: [data_server]
+    description: "接收交易所行情数据并分发"
+```
+
+也可以通过对话让 AI 自动注册：`"帮我添加行情网关服务，代码在 /data/repos/market_gateway"`
+
+日志分析模式下的对话框支持拖拽上传日志文件、Ctrl+V 粘贴截图、附件按钮。AI 会自动分析错误、定位代码、追踪依赖链。不同用户的会话通过 git worktree 隔离代码版本。
 
 ## 项目结构
 
 ```
 knowledge-chat/
 ├── app.py                    # Flask 主应用
-├── agent_engine.py           # Agent 引擎（知识域加载 + 工具 + API 调用）
+├── agent_engine.py           # Agent 引擎（工具 + API 调用 + 知识域加载）
 ├── log_analyzer.py           # 日志分析模块（Session + worktree + 日志预处理）
-├── confluence_converter.py   # Confluence HTML → Markdown 转换器
-├── config.yaml               # 全局配置（mode 字段切换运行模式）
+├── confluence_converter.py   # Confluence HTML → Markdown 转换
+├── config.yaml               # 全局配置
 ├── services.yaml             # 服务注册表（日志分析模式用）
 ├── AI_GUIDE.md               # AI 生成知识域的工作指南
 ├── AI_GUIDE_ANALYZER.md      # AI 生成服务注册的工作指南
-├── CHANGELOG.md              # 变更日志
-├── CLAUDE.md                 # Claude Code 项目指令
-├── start.sh                  # 启动脚本
-├── requirements.txt          # Python 依赖
-├── Dockerfile
-├── docker-compose.yml
 ├── knowledge/                # 知识域目录
-│   ├── _template/            # 模板（不会被引擎加载）
-│   │   ├── domain.yaml
-│   │   └── data/
+│   ├── _template/            # 模板
 │   ├── _memory/              # AI 全局学习记忆
-│   └── <domain>/             # 各知识域
-│       ├── domain.yaml
-│       └── data/             # 该域的所有资料（已 gitignore）
-├── templates/
-│   ├── chat.html             # 聊天页面（支持文件上传）
-│   └── share.html            # 分享只读页面
-├── shares/                   # 分享数据（运行时生成）
-└── logs/                     # 日志文件（运行时生成）
+│   └── <domain>/             # 各知识域（domain.yaml + data/）
+└── templates/
+    ├── chat.html             # 聊天页面（支持文件上传）
+    └── share.html            # 分享只读页面
 ```
 
 ## 工具集
 
-### 通用工具
+### 通用工具（两种模式都可用）
 
 | 工具 | 功能 |
 |------|------|
@@ -226,18 +213,16 @@ knowledge-chat/
 | glob | 按模式匹配文件路径 |
 | bash | 执行 shell 命令 |
 | web_fetch | 抓取网页内容 |
-| run_python | 执行 Python 代码，可用于数据库查询和数据分析 |
+| run_python | 执行 Python 代码（数据库查询、数据分析） |
 
-### 日志分析模式专用工具
-
-以下工具仅在 `mode: log-analyzer` 时可用：
+### 日志分析专用工具
 
 | 工具 | 功能 |
 |------|------|
-| read_log | 读取并过滤日志文件，支持按级别、关键词、时间范围筛选 |
-| trace_dependency | 查询服务依赖链，显示上下游服务关系 |
-| switch_service | 加载服务代码到当前会话（创建 git worktree），后续可用 search/read_file 查看 |
-| list_services | 列出所有已注册的服务及其依赖关系 |
+| read_log | 过滤日志：按级别、关键词、时间范围筛选 |
+| trace_dependency | 查询服务依赖链 |
+| switch_service | 加载服务代码（git worktree） |
+| list_services | 列出已注册服务 |
 
 ### 扩展工具
 
@@ -245,58 +230,3 @@ knowledge-chat/
 
 1. 在 `TOOLS` 列表中添加工具定义（name、description、input_schema）
 2. 在 `exec_tool()` 中添加对应的 `elif` 分支
-
-## 日志分析模式
-
-将 `config.yaml` 中的 `mode` 改为 `log-analyzer`，即可切换为日志分析助手。适用于多微服务环境下的故障排查。
-
-### 启动
-
-```bash
-# 修改 config.yaml: mode: log-analyzer
-python app.py
-```
-
-也可以同时部署两个实例：
-
-```bash
-# 实例 1：知识域助手（mode: knowledge，端口 5000）
-# 实例 2：日志分析助手（mode: log-analyzer，端口 5001）
-```
-
-### 注册服务
-
-编辑 `services.yaml` 添加微服务信息，或在对话中让 AI 自动生成：
-
-```yaml
-services:
-  market_gateway:
-    name: "行情网关"
-    repo: "/data/repos/market_gateway"
-    language: "C++"
-    depends_on: [data_server, config_center]
-    description: "接收交易所行情数据并分发"
-```
-
-也可以通过对话让 AI 自动注册：
-
-```
-"帮我添加行情网关服务，代码在 /data/repos/market_gateway，C++ 项目，依赖 data_server"
-```
-
-AI 会读取 `AI_GUIDE_ANALYZER.md` 指南，自动扫描代码仓库并生成配置。
-
-### 使用方式
-
-日志分析模式下，对话框支持：
-
-- **拖拽上传** — 将日志文件或压缩包拖到对话框区域
-- **粘贴截图** — Ctrl+V 粘贴日志截图，AI 直接识别图片内容
-- **附件按钮** — 点击 📎 按钮选择文件上传
-- **支持格式** — `.log`、`.txt`、`.zip`、`.tar.gz`、`.png`、`.jpg`
-
-AI 会自动分析日志中的错误，结合服务代码定位问题根因，沿依赖链追踪上下游。信息不足时会主动引导补充。
-
-### 代码版本隔离
-
-AI 调用 `switch_service` 工具时，会通过 git worktree 将指定版本的代码 checkout 到独立目录。不同用户的会话（session）之间完全隔离，可以同时分析同一服务的不同版本。session 过期后自动清理 worktree。
