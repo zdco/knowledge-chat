@@ -68,6 +68,7 @@ if APP_MODE == "log-analyzer":
         session_ttl=_analyzer_cfg.get("session_ttl", 86400),
     )
     _session_manager.cleanup_expired()
+    _session_manager.start_cleanup_timer()
 
 
 def _find_service(name: str) -> tuple[str, dict] | tuple[None, None]:
@@ -1569,6 +1570,9 @@ def _run_openai_stream(messages: list, session_id: str = None):
 
 def run_agent_stream(messages: list, session_id: str = None):
     """Agent 循环：根据 API_FORMAT 选择对应 SDK 进行流式调用"""
+    # 更新 session 活跃时间
+    if session_id and _session_manager:
+        _session_manager.touch_session(session_id)
     if API_FORMAT == "openai":
         yield from _run_openai_stream(messages, session_id=session_id)
     else:

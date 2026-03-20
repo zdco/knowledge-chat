@@ -371,8 +371,15 @@ class SessionManager:
             shutil.rmtree(session_path, ignore_errors=True)
         logger.info("session 已清理: %s", session_id)
 
+    def touch_session(self, session_id: str):
+        """更新 session 最后活跃时间"""
+        meta = self.get_meta(session_id)
+        if meta:
+            meta["last_active"] = datetime.now().isoformat()
+            self.save_meta(session_id, meta)
+
     def cleanup_expired(self):
-        """清理过期 session"""
+        """清理过期 session（按最后活跃时间判断）"""
         if not os.path.isdir(self.session_dir):
             return
         now = time.time()
@@ -386,8 +393,9 @@ class SessionManager:
                 if os.path.isfile(meta_path):
                     with open(meta_path, "r", encoding="utf-8") as f:
                         meta = json.load(f)
-                    created = datetime.fromisoformat(meta.get("created_at", ""))
-                    age = now - created.timestamp()
+                    # 优先用 last_active，没有则用 created_at
+                    ts_str = meta.get("last_active") or meta.get("created_at", "")
+                    age = now - datetime.fromisoformat(ts_str).timestamp()
                 else:
                     age = now - os.path.getmtime(session_path)
             except Exception:
@@ -397,6 +405,22 @@ class SessionManager:
                 cleaned += 1
         if cleaned:
             logger.info("已清理 %d 个过期 session", cleaned)
+
+    def start_cleanup_timer(self, interval: int = 3600):
+        """启动定时清理线程，默认每小时执行一次"""
+        import threading
+
+        def _loop():
+            while True:
+                time.sleep(interval)
+                try:
+                    self.cleanup_expired()
+                except Exception as e:
+                    logger.error("定时清理 session 失败: %s", e)
+
+        t = threading.Thread(target=_loop, daemon=True)
+        t.start()
+        logger.info("session 定时清理已启动，间隔 %d 秒", interval)
 
 
 # ── 文件上传处理 ──────────────────────────────────────────
