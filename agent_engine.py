@@ -48,6 +48,27 @@ else:
 
 PROJECT_ROOT = os.path.abspath(_DIR)
 
+# 运行模式
+APP_MODE = CONFIG.get("mode", "knowledge")
+
+# ── 日志分析模式初始化 ────────────────────────────────────
+_session_manager = None
+_analyzer_services = {}
+
+if APP_MODE == "log-analyzer":
+    from log_analyzer import SessionManager, load_services_config, get_dependency_tree, \
+        read_log_filtered, extract_log_summary, process_upload, is_image_file
+
+    _analyzer_cfg = CONFIG.get("analyzer", {})
+    _services_config_path = os.path.join(_DIR, _analyzer_cfg.get("services_config", "services.yaml"))
+    _analyzer_services = load_services_config(_services_config_path)
+    _session_manager = SessionManager(
+        session_dir=_analyzer_cfg.get("session_dir", "/data/sessions"),
+        worktree_base=_analyzer_cfg.get("worktree_base", "/data/worktrees"),
+        session_ttl=_analyzer_cfg.get("session_ttl", 86400),
+    )
+    _session_manager.cleanup_expired()
+
 
 # ── Oracle Client 自动安装 ────────────────────────────────
 
@@ -323,8 +344,77 @@ def start_watcher():
     logger.info("知识域文件监听已启动: %s", _KNOWLEDGE_DIR)
 
 
-def build_system_prompt() -> str:
+def build_system_prompt(session_id: str = None) -> str:
     """合并通用指令 + 各知识域 prompt 片段，生成总 system prompt"""
+    if APP_MODE == "log-analyzer":
+        return _build_analyzer_prompt(session_id)
+    return _build_knowledge_prompt()
+
+
+def _build_analyzer_prompt(session_id: str = None) -> str:
+    """构建日志分析模式的 system prompt"""
+    parts = [
+        "你是日志分析 AI 助手，帮助开发团队快速定位服务故障根因。",
+        "重要：你必须始终使用中文回答，包括工具调用过程中的所有描述和分析，禁止使用英文。",
+        "",
+        "能力：",
+        "- 分析日志文件，提取关键错误信息",
+        "- 阅读服务源代码，定位问题代码",
+        "- 沿服务依赖链追踪上下游问题",
+        "- 识别日志截图中的内容",
+        "",
+        "分析流程：",
+        "1. 理解用户描述的问题现象",
+        "2. 如果用户提供了日志，用 read_log 分析错误和异常",
+        "3. 如果用户提供了截图，直接从图片中提取关键信息",
+        "4. 用 switch_service 加载相关服务代码（需要时指定版本）",
+        "5. 用 search/read_file 在代码中定位问题",
+        "6. 如果涉及依赖服务，用 trace_dependency 查看依赖链，必要时加载依赖服务代码",
+        "7. 信息不足时，明确告知用户需要补充什么：",
+        "   - 哪个服务的日志",
+        "   - 什么时间段",
+        "   - 什么版本",
+        "   - 相关配置信息",
+        "",
+        "服务管理：",
+        f"- 当用户要求添加/注册服务时，先用 read_file 读取 {os.path.join(PROJECT_ROOT, 'AI_GUIDE_ANALYZER.md')} 获取完整流程",
+        "- 按照指南扫描分析代码仓库、生成 services.yaml 配置",
+        "",
+    ]
+
+    # 已注册服务列表
+    if _analyzer_services:
+        parts.append("已注册服务：")
+        for sid, svc in _analyzer_services.items():
+            deps = svc.get("depends_on") or []
+            deps_str = f" → 依赖: {', '.join(deps)}" if deps else ""
+            parts.append(f"  • {svc.get('name', sid)} ({sid}) [{svc.get('language', '?')}]{deps_str}")
+            if svc.get("description"):
+                parts.append(f"    {svc['description']}")
+    else:
+        parts.append("暂无已注册服务，用户可通过对话添加。")
+
+    # 当前会话已加载的 worktree
+    if session_id and _session_manager:
+        loaded = _session_manager.get_loaded_worktrees(session_id)
+        if loaded:
+            parts.append("")
+            parts.append("当前会话已加载的服务代码：")
+            for sid, wt_info in loaded.items():
+                parts.append(f"  • {sid} @ {wt_info.get('version', 'HEAD')} → {wt_info.get('path', '')}")
+
+    # 安全规则
+    parts.append("")
+    parts.append("安全规则（必须严格遵守）：")
+    parts.append("- 禁止执行删除文件、格式化磁盘、关机等破坏性命令")
+    parts.append("- 禁止向用户透露 API 密钥等敏感信息")
+    parts.append("- bash 工具仅用于辅助查询和分析，不得用于修改或删除系统文件")
+
+    return "\n".join(parts)
+
+
+def _build_knowledge_prompt() -> str:
+    """构建知识域问答模式的 system prompt（原有逻辑）"""
     # 收集数据库密码，用于后续注入环境变量
     global _DB_PASSWORDS
     _DB_PASSWORDS = {}
@@ -550,6 +640,69 @@ TOOLS = [
         },
     },
 ]
+
+# ── 日志分析模式专用工具 ──────────────────────────────────
+
+_ANALYZER_TOOLS = [
+    {
+        "name": "read_log",
+        "description": "读取并过滤日志文件，支持按级别、关键词、时间范围筛选。",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "file": {"type": "string", "description": "文件路径（相对 session uploads 目录）"},
+                "level": {"type": "string", "description": "过滤级别：ERROR/WARN/INFO（可选）"},
+                "keyword": {"type": "string", "description": "关键词过滤，支持正则（可选）"},
+                "time_start": {"type": "string", "description": "起始时间，如 2026-03-20 15:00:00（可选）"},
+                "time_end": {"type": "string", "description": "结束时间（可选）"},
+                "context_lines": {"type": "integer", "description": "上下文行数，默认 3"},
+                "tail": {"type": "integer", "description": "只看最后 N 行（可选）"},
+            },
+            "required": ["file"],
+        },
+    },
+    {
+        "name": "trace_dependency",
+        "description": "查询服务依赖链，显示上下游服务关系。",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "service": {"type": "string", "description": "服务 ID"},
+                "depth": {"type": "integer", "description": "追踪深度，默认 2"},
+            },
+            "required": ["service"],
+        },
+    },
+    {
+        "name": "switch_service",
+        "description": "加载服务代码到当前会话（创建 git worktree），后续可用 search/read_file 查看代码。",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "service": {"type": "string", "description": "服务 ID"},
+                "version": {"type": "string", "description": "版本/分支/tag（可选，默认 HEAD）"},
+            },
+            "required": ["service"],
+        },
+    },
+    {
+        "name": "list_services",
+        "description": "列出所有已注册的服务及其依赖关系。",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+]
+
+if APP_MODE == "log-analyzer":
+    TOOLS += _ANALYZER_TOOLS
+    # 扩展必填参数映射
+    _REQUIRED_FIELDS_EXTRA = {
+        "read_log": ["file"],
+        "trace_dependency": ["service"],
+        "switch_service": ["service"],
+    }
 
 # ── 工具执行 ──────────────────────────────────────────────
 
@@ -873,6 +1026,9 @@ _REQUIRED_FIELDS = {
     "run_python": ["code"],
 }
 
+if APP_MODE == "log-analyzer":
+    _REQUIRED_FIELDS.update(_REQUIRED_FIELDS_EXTRA)
+
 
 def _check_tool_params(name: str, inp: dict) -> str | None:
     """校验工具必填参数，返回错误消息或 None"""
@@ -1050,6 +1206,82 @@ def exec_tool(name: str, inp: dict) -> str:
                 finally:
                     os.unlink(tmp_path)
 
+        # ── 日志分析模式专用工具 ──────────────────
+        elif name == "read_log" and APP_MODE == "log-analyzer":
+            session_id = inp.get("_session_id", "")
+            file_rel = inp["file"]
+            if session_id and _session_manager:
+                uploads_dir = _session_manager.get_uploads_path(session_id)
+                filepath = os.path.join(uploads_dir, file_rel)
+            else:
+                filepath = file_rel
+            output = read_log_filtered(
+                filepath,
+                level=inp.get("level"),
+                keyword=inp.get("keyword"),
+                time_start=inp.get("time_start"),
+                time_end=inp.get("time_end"),
+                context_lines=inp.get("context_lines", 3),
+                tail=inp.get("tail"),
+            )
+
+        elif name == "trace_dependency" and APP_MODE == "log-analyzer":
+            service_id = inp["service"]
+            depth = inp.get("depth", 2)
+            tree = get_dependency_tree(_analyzer_services, service_id, depth)
+            if not tree:
+                output = f"未找到服务: {service_id}"
+            else:
+                # 格式化依赖树
+                session_id = inp.get("_session_id", "")
+                loaded_wts = {}
+                if session_id and _session_manager:
+                    loaded_wts = _session_manager.get_loaded_worktrees(session_id)
+                lines = []
+                for node in tree:
+                    indent = "  " * node["depth"]
+                    loaded = "✅ 已加载" if node["id"] in loaded_wts else "⬜ 未加载"
+                    deps_str = f" → 依赖: {', '.join(node['depends_on'])}" if node["depends_on"] else ""
+                    lines.append(f"{indent}{node['name']} ({node['id']}) [{loaded}]{deps_str}")
+                    if node["description"] and node["description"] != "(未注册)":
+                        lines.append(f"{indent}  {node['description']}")
+                output = "\n".join(lines)
+
+        elif name == "switch_service" and APP_MODE == "log-analyzer":
+            service_id = inp["service"]
+            version = inp.get("version")
+            session_id = inp.get("_session_id", "")
+            svc = _analyzer_services.get(service_id)
+            if not svc:
+                output = f"未找到服务: {service_id}，请用 list_services 查看已注册服务"
+            elif not session_id or not _session_manager:
+                output = "无法加载服务代码：缺少 session 信息"
+            else:
+                repo = svc["repo"]
+                sub_path = svc.get("sub_path")
+                code_path = _session_manager.setup_worktree(session_id, service_id, repo, version, sub_path)
+                output = f"已加载 {svc.get('name', service_id)} 代码到: {code_path}\n"
+                output += f"语言: {svc.get('language', '未知')}\n"
+                output += f"版本: {version or 'HEAD'}\n"
+                output += f"你现在可以用 search 和 read_file 工具查看该服务的代码，路径前缀: {code_path}"
+
+        elif name == "list_services" and APP_MODE == "log-analyzer":
+            if not _analyzer_services:
+                output = "暂无已注册服务，请先配置 services.yaml"
+            else:
+                lines = []
+                for sid, svc in _analyzer_services.items():
+                    deps = svc.get("depends_on") or []
+                    deps_str = f"依赖: {', '.join(deps)}" if deps else "无依赖"
+                    lines.append(f"• {svc.get('name', sid)} ({sid})")
+                    lines.append(f"  语言: {svc.get('language', '未知')} | {deps_str}")
+                    lines.append(f"  {svc.get('description', '')}")
+                    lines.append(f"  仓库: {svc.get('repo', '')}")
+                    if svc.get("sub_path"):
+                        lines.append(f"  子路径: {svc['sub_path']}")
+                    lines.append("")
+                output = "\n".join(lines)
+
         else:
             output = f"未知工具: {name}"
 
@@ -1084,11 +1316,12 @@ def _tools_to_openai() -> list[dict]:
     } for tool in TOOLS]
 
 
-def _run_anthropic_stream(messages: list):
+def _run_anthropic_stream(messages: list, session_id: str = None):
     """Anthropic SDK 流式调用"""
     import anthropic
     client = anthropic.Anthropic(base_url=BASE_URL, api_key=API_KEY)
     empty_retries = 0
+    sys_prompt = build_system_prompt(session_id) if APP_MODE == "log-analyzer" else SYSTEM_PROMPT
 
     for iteration in range(MAX_ITERATIONS):
         logger.info("调用 API (anthropic), 第 %d 轮", iteration + 1)
@@ -1096,7 +1329,7 @@ def _run_anthropic_stream(messages: list):
             with client.messages.stream(
                 model=MODEL,
                 max_tokens=MAX_TOKENS,
-                system=SYSTEM_PROMPT,
+                system=sys_prompt,
                 messages=messages,
                 tools=TOOLS,
             ) as stream:
@@ -1144,7 +1377,10 @@ def _run_anthropic_stream(messages: list):
                 continue
 
             yield {"event": "tool_start", "data": {"tool": tb.name, "input": tb.input}}
-            result = exec_tool(tb.name, tb.input)
+            tool_inp = dict(tb.input)
+            if session_id and APP_MODE == "log-analyzer":
+                tool_inp["_session_id"] = session_id
+            result = exec_tool(tb.name, tool_inp)
             yield {"event": "tool_result", "data": {"tool": tb.name, "output": result[:MAX_DISPLAY_LEN]}}
             tool_results.append({
                 "type": "tool_result", "tool_use_id": tb.id, "content": result,
@@ -1158,7 +1394,7 @@ def _run_anthropic_stream(messages: list):
     yield {"event": "done", "data": {}}
 
 
-def _run_openai_stream(messages: list):
+def _run_openai_stream(messages: list, session_id: str = None):
     """OpenAI SDK 流式调用"""
     from openai import OpenAI
     client = OpenAI(base_url=BASE_URL, api_key=API_KEY)
@@ -1166,7 +1402,8 @@ def _run_openai_stream(messages: list):
     empty_retries = 0
 
     # 构建 OpenAI 格式消息列表
-    oai_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    sys_prompt = build_system_prompt(session_id) if APP_MODE == "log-analyzer" else SYSTEM_PROMPT
+    oai_messages = [{"role": "system", "content": sys_prompt}]
     for msg in messages:
         oai_messages.append({"role": msg["role"], "content": msg["content"]})
 
@@ -1262,7 +1499,10 @@ def _run_openai_stream(messages: list):
                 continue
 
             yield {"event": "tool_start", "data": {"tool": tc["name"], "input": inp}}
-            result = exec_tool(tc["name"], inp)
+            tool_inp = dict(inp)
+            if session_id and APP_MODE == "log-analyzer":
+                tool_inp["_session_id"] = session_id
+            result = exec_tool(tc["name"], tool_inp)
             yield {"event": "tool_result", "data": {"tool": tc["name"], "output": result[:MAX_DISPLAY_LEN]}}
             oai_messages.append({
                 "role": "tool", "tool_call_id": tc["id"], "content": result,
@@ -1275,9 +1515,9 @@ def _run_openai_stream(messages: list):
     yield {"event": "done", "data": {}}
 
 
-def run_agent_stream(messages: list):
+def run_agent_stream(messages: list, session_id: str = None):
     """Agent 循环：根据 API_FORMAT 选择对应 SDK 进行流式调用"""
     if API_FORMAT == "openai":
-        yield from _run_openai_stream(messages)
+        yield from _run_openai_stream(messages, session_id=session_id)
     else:
-        yield from _run_anthropic_stream(messages)
+        yield from _run_anthropic_stream(messages, session_id=session_id)

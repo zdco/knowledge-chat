@@ -1,5 +1,10 @@
 # 全能 AI 助手 - 配置文件
 
+# ── 运行模式 ──────────────────────────────────
+# knowledge: 知识域问答模式（默认）
+# log-analyzer: 日志分析模式（需配合 services.yaml）
+mode: knowledge
+
 # API 配置（环境变量优先于此处配置：AI_CHAT_BASE_URL / AI_CHAT_API_KEY / AI_CHAT_MODEL）
 api:
   # 代理地址（含 /v1 自动走 OpenAI 格式，否则走 Anthropic 格式）
@@ -46,3 +51,12 @@ logging:
   level: "INFO"
   file: "logs/app.log"
   backup_days: 30
+
+# ── 日志分析模式专用配置 ──────────────────────
+# 以下配置仅在 mode: log-analyzer 时生效
+analyzer:
+  services_config: "services.yaml"       # 服务注册表路径
+  session_dir: "/data/sessions"          # session 数据目录
+  worktree_base: "/data/worktrees"       # git worktree 根目录
+  session_ttl: 86400                     # session 过期时间（秒）
+  max_upload_size: 104857600             # 最大上传文件大小（100MB）

@@ -97,6 +97,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .share-modal .close-btn{margin-top:12px;text-align:right}
 .share-modal .close-btn button{background:none;border:1px solid var(--border);border-radius:8px;padding:6px 16px;font-size:13px;cursor:pointer;color:var(--text-secondary)}
 .share-modal .close-btn button:hover{background:var(--bg)}
+
+/* 文件上传相关样式 */
+.upload-btn{background:none;border:1px solid var(--border);border-radius:var(--radius);padding:0 12px;cursor:pointer;font-size:18px;color:var(--text-secondary);display:none}
+.upload-btn:hover{border-color:var(--primary);color:var(--primary)}
+.drop-overlay{position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(25,118,210,0.12);z-index:300;display:none;align-items:center;justify-content:center;pointer-events:none}
+.drop-overlay.active{display:flex}
+.drop-overlay .drop-hint{background:#fff;border:2px dashed var(--primary);border-radius:16px;padding:40px 60px;font-size:16px;color:var(--primary);font-weight:600}
+.upload-preview{display:flex;flex-wrap:wrap;gap:8px;padding:0 24px 8px;max-height:120px;overflow-y:auto}
+.upload-preview:empty{display:none}
+.upload-item{display:flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--text)}
+.upload-item img{width:40px;height:40px;object-fit:cover;border-radius:4px}
+.upload-item .remove{cursor:pointer;color:#e53935;font-weight:bold;margin-left:4px}
+.upload-item .remove:hover{color:#b71c1c}
+.msg-ai .inline-image{max-width:300px;max-height:200px;border-radius:8px;margin:4px 0}
 </style>
 </head>
 <body>
@@ -133,7 +147,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
     {% endfor %}
   </div>
 </div>
+<div class="drop-overlay" id="dropOverlay"><div class="drop-hint">📎 拖放文件到此处上传</div></div>
+<div class="upload-preview" id="uploadPreview"></div>
 <div class="input-area">
+  <button class="upload-btn" id="uploadBtn" onclick="document.getElementById('fileInput').click()" title="上传文件">📎</button>
+  <input type="file" id="fileInput" multiple accept=".log,.txt,.zip,.tar,.gz,.tgz,.png,.jpg,.jpeg" style="display:none" onchange="handleFileSelect(this.files)">
   <textarea id="userInput" placeholder="输入你的问题..." rows="1" onkeydown="handleKey(event)"></textarea>
   <button id="sendBtn" onclick="sendMessage()">发送</button>
 </div>
@@ -146,8 +164,152 @@ const sendBtn=document.getElementById('sendBtn');
 let history=[];
 let sending=false;
 
+// 运行模式
+const APP_MODE='{{ app_mode }}';
+
 // 从当前页面路径提取路由前缀，适配 nginx 反代不同路径
 const BASE_PATH=location.pathname.replace(/\/chat$/,'');
+
+// ── 文件上传（log-analyzer 模式）──────────────────
+let pendingFiles=[];  // [{file, preview_url, type}]
+let pendingImages=[]; // [{data: base64, media_type}]
+let analyzerSessionId=null;
+
+if(APP_MODE==='log-analyzer'){
+  document.getElementById('uploadBtn').style.display='block';
+  initUploadHandlers();
+}
+
+function initUploadHandlers(){
+  const dropOverlay=document.getElementById('dropOverlay');
+  let dragCounter=0;
+
+  // 拖拽上传
+  document.addEventListener('dragenter',function(e){
+    e.preventDefault();
+    dragCounter++;
+    dropOverlay.classList.add('active');
+  });
+  document.addEventListener('dragleave',function(e){
+    e.preventDefault();
+    dragCounter--;
+    if(dragCounter<=0){dropOverlay.classList.remove('active');dragCounter=0}
+  });
+  document.addEventListener('dragover',function(e){e.preventDefault()});
+  document.addEventListener('drop',function(e){
+    e.preventDefault();
+    dragCounter=0;
+    dropOverlay.classList.remove('active');
+    if(e.dataTransfer.files.length)handleFileSelect(e.dataTransfer.files);
+  });
+
+  // 粘贴图片
+  userInput.addEventListener('paste',function(e){
+    const items=e.clipboardData&&e.clipboardData.items;
+    if(!items)return;
+    for(let i=0;i<items.length;i++){
+      if(items[i].type.indexOf('image/')===0){
+        e.preventDefault();
+        const file=items[i].getAsFile();
+        if(file)addPendingFile(file);
+        break;
+      }
+    }
+  });
+}
+
+function handleFileSelect(files){
+  for(let i=0;i<files.length;i++){addPendingFile(files[i])}
+  document.getElementById('fileInput').value='';
+}
+
+function addPendingFile(file){
+  const isImg=/\.(png|jpg|jpeg)$/i.test(file.name);
+  const entry={file:file,type:isImg?'image':'log',id:Date.now()+'_'+Math.random().toString(36).slice(2,5)};
+  if(isImg){
+    entry.preview_url=URL.createObjectURL(file);
+  }
+  pendingFiles.push(entry);
+  renderUploadPreview();
+}
+
+function removePendingFile(id){
+  pendingFiles=pendingFiles.filter(f=>f.id!==id);
+  renderUploadPreview();
+}
+
+function renderUploadPreview(){
+  const container=document.getElementById('uploadPreview');
+  container.innerHTML='';
+  pendingFiles.forEach(f=>{
+    const div=document.createElement('div');
+    div.className='upload-item';
+    if(f.type==='image'&&f.preview_url){
+      div.innerHTML=`<img src="${f.preview_url}"><span>${f.file.name}</span><span class="remove" onclick="removePendingFile('${f.id}')">&times;</span>`;
+    }else{
+      div.innerHTML=`<span>📄 ${f.file.name}</span><span class="remove" onclick="removePendingFile('${f.id}')">&times;</span>`;
+    }
+    container.appendChild(div);
+  });
+}
+
+async function uploadFiles(){
+  // 分离图片和日志文件
+  const imageFiles=pendingFiles.filter(f=>f.type==='image');
+  const logFiles=pendingFiles.filter(f=>f.type==='log');
+  const images=[];
+  let uploadContext='';
+
+  // 图片转 base64
+  for(const entry of imageFiles){
+    const b64=await fileToBase64(entry.file);
+    images.push({data:b64,media_type:entry.file.content_type||'image/png'});
+  }
+
+  // 日志文件上传到服务器
+  if(logFiles.length>0){
+    const formData=new FormData();
+    formData.append('session_id',analyzerSessionId||'');
+    logFiles.forEach(f=>formData.append('files',f.file));
+    try{
+      const resp=await fetch(BASE_PATH+'/api/upload',{method:'POST',body:formData});
+      const data=await resp.json();
+      if(data.session_id)analyzerSessionId=data.session_id;
+      // 构建上传摘要作为上下文
+      const parts=[];
+      for(const u of (data.uploads||[])){
+        if(u.error){parts.push(`文件 ${u.name} 上传失败: ${u.error}`);continue}
+        if(u.type==='log'){
+          parts.push(`已上传日志文件 ${u.name}：`);
+          for(const fi of (u.files||[])){
+            parts.push(`  路径: ${fi.path}`);
+            if(fi.summary)parts.push(`  摘要: ${fi.summary}`);
+          }
+        }
+      }
+      uploadContext=parts.join('\n');
+    }catch(e){
+      uploadContext='文件上传失败: '+e.message;
+    }
+  }
+
+  pendingFiles=[];
+  renderUploadPreview();
+  return {images,uploadContext};
+}
+
+function fileToBase64(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const result=reader.result;
+      const b64=result.split(',')[1];
+      resolve(b64);
+    };
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 // ── 对话历史持久化 ──────────────────────────────
 const STORAGE_KEY='mdschat_sessions_'+location.port+'_'+location.pathname;
@@ -320,7 +482,8 @@ function setToolResult(block,output){
 // ── 发送消息 ──────────────────────────────────
 async function sendMessage(){
   const text=userInput.value.trim();
-  if(!text||sending)return;
+  const hasFiles=pendingFiles.length>0;
+  if((!text&&!hasFiles)||sending)return;
   sending=true;
   sendBtn.disabled=true;
   userScrolled=false;
@@ -328,8 +491,25 @@ async function sendMessage(){
   const welcome=document.getElementById('welcome');
   if(welcome)welcome.style.display='none';
 
-  addMsg('user',escHtml(text));
-  history.push({role:'user',content:text});
+  // 处理文件上传
+  let images=[];
+  let uploadContext='';
+  if(hasFiles&&APP_MODE==='log-analyzer'){
+    addMsg('user',escHtml(text||'')+(pendingFiles.length?' <span style="color:var(--text-secondary)">(附件 '+pendingFiles.length+' 个文件)</span>':''));
+    const uploadResult=await uploadFiles();
+    images=uploadResult.images;
+    uploadContext=uploadResult.uploadContext;
+  }else{
+    addMsg('user',escHtml(text));
+  }
+
+  // 构建发送消息
+  let messageText=text;
+  if(uploadContext){
+    messageText=(text?text+'\n\n':'')+'[上传文件信息]\n'+uploadContext;
+  }
+
+  if(messageText)history.push({role:'user',content:messageText});
   userInput.value='';
   userInput.style.height='auto';
 
@@ -346,7 +526,12 @@ async function sendMessage(){
   let currentToolBlock=null;
 
   try{
-    const resp=await fetch(BASE_PATH+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,history:history.slice(0,-1)})});
+    const body={message:messageText||'',history:history.slice(0,-1)};
+    if(APP_MODE==='log-analyzer'){
+      body.session_id=analyzerSessionId||'';
+      if(images.length>0)body.images=images;
+    }
+    const resp=await fetch(BASE_PATH+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const reader=resp.body.getReader();
     const decoder=new TextDecoder();
     let buffer='';
@@ -368,7 +553,9 @@ async function sendMessage(){
           let data;
           try{data=JSON.parse(raw)}catch{continue}
 
-          if(eventType==='tool_start'){
+          if(eventType==='session'){
+            if(data.session_id)analyzerSessionId=data.session_id;
+          }else if(eventType==='tool_start'){
             if(thinkingEl.parentNode)thinkingEl.remove();
             // 工具调用前，结束当前 AI 回复块
             if(aiDiv){

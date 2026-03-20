@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- 日志分析模式（log-analyzer）：config.yaml 新增 `mode` 字段切换运行模式，`analyzer` 配置段定义 session/worktree 参数
+- 服务注册表（services.yaml）：定义微服务名称、仓库路径、语言、依赖关系，支持 AI 通过对话自动生成
+- AI_GUIDE_ANALYZER.md：服务注册指南，AI 按指南自动扫描代码仓库并生成 services.yaml 配置
+- log_analyzer.py：SessionManager 管理分析会话（创建/清理/过期回收）、git worktree 版本隔离、文件上传处理（zip/tar.gz 自动解压）、日志预处理（ERROR 摘要提取、按级别/关键词/时间范围过滤）
+- 新增 4 个日志分析专用工具：read_log（日志过滤读取）、trace_dependency（依赖链查询）、switch_service（加载服务代码 worktree）、list_services（列出已注册服务）
+- 文件上传路由（POST /api/upload）：支持日志文件、压缩包、截图上传，压缩包自动解压，图片返回 base64 供多模态消息使用
+- chat.html 增强：拖拽上传文件、Ctrl+V 粘贴截图、附件按钮、上传预览区、图片多模态消息支持
+- 多模态图片支持：用户上传/粘贴的截图作为 base64 图片消息发送给 AI，支持日志截图识别
+- agent_engine.py 支持 session_id 透传：run_agent_stream → 流式调用 → exec_tool，log-analyzer 模式下动态构建 system prompt
 - Office/PDF 文本缓存预处理：启动时将二进制文件转为纯文本缓存到 `.text_cache/` 目录，search 工具 grep 搜缓存文件替代实时解析，read_file 优先读缓存
 - watchdog 监听 Office/PDF 文件变更，自动增量更新文本缓存（新增/修改/删除）
 - `confluence_zip` 配置支持列表格式，可同时导入多个 Confluence 导出 zip 包

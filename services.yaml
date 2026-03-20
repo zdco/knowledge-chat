@@ -1,0 +1,20 @@
+# 服务注册表 - 日志分析模式专用
+# 通过对话让 AI 自动生成，或手动编辑
+# 使用方法：参考 AI_GUIDE_ANALYZER.md
+
+services:
+  # 示例（取消注释并修改）：
+  # market_gateway:
+  #   name: "行情网关"
+  #   repo: "/data/repos/market_gateway"
+  #   language: "C++"
+  #   depends_on: [data_server, config_center]
+  #   description: "行情网关服务，负责接收交易所行情数据并分发"
+  #
+  # data_server:
+  #   name: "数据服务"
+  #   repo: "/data/repos/monorepo"
+  #   sub_path: "services/data_server"
+  #   language: "Java"
+  #   depends_on: [database]
+  #   description: "数据存储和查询服务"
