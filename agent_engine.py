@@ -769,9 +769,27 @@ if APP_MODE == "log-analyzer":
 # ── 工具执行 ──────────────────────────────────────────────
 
 
-def _safe_path(rel: str) -> str:
-    """将相对路径转为绝对路径，限制在项目根目录内"""
+def _safe_path(rel: str, allowed_paths: list[str] = None) -> str:
+    """将相对路径转为绝对路径，限制在允许的目录内。
+
+    Args:
+        rel: 相对或绝对路径
+        allowed_paths: 允许访问的目录列表（log-analyzer 模式），为 None 时限制在 PROJECT_ROOT
+    """
+    # 如果是绝对路径且有允许列表，直接校验
+    if allowed_paths and os.path.isabs(rel):
+        abs_path = os.path.normpath(rel)
+        if any(abs_path.startswith(p) for p in allowed_paths):
+            return abs_path
+        return allowed_paths[0]  # 不在允许范围内，返回第一个允许路径
+
     abs_path = os.path.normpath(os.path.join(PROJECT_ROOT, rel))
+
+    if allowed_paths:
+        if any(abs_path.startswith(p) for p in allowed_paths):
+            return abs_path
+        return allowed_paths[0]
+
     if not abs_path.startswith(PROJECT_ROOT):
         return PROJECT_ROOT
     return abs_path
@@ -1110,10 +1128,16 @@ def exec_tool(name: str, inp: dict) -> str:
         return param_err
 
     t0 = time.time()
+    # log-analyzer 模式下，限制文件操作在当前 session 的允许路径内
+    _allowed = None
+    if APP_MODE == "log-analyzer" and _session_manager:
+        _sid = inp.get("_session_id", "")
+        if _sid:
+            _allowed = _session_manager.get_allowed_paths(_sid)
     try:
         if name == "search":
             keyword = inp["keyword"]
-            path = _safe_path(inp.get("path", ""))
+            path = _safe_path(inp.get("path", ""), _allowed)
             ctx = str(inp.get("context_lines", 3))
             result = subprocess.run(
                 ["grep", "-E", "-r", "-n", f"-C{ctx}",
@@ -1167,7 +1191,7 @@ def exec_tool(name: str, inp: dict) -> str:
                     output = f"在 {os.path.relpath(path, PROJECT_ROOT)} 中未找到，已自动扩大搜索范围：\n{fallback.stdout}"
 
         elif name == "read_file":
-            fpath = _safe_path(inp["path"])
+            fpath = _safe_path(inp["path"], _allowed)
             ext = os.path.splitext(fpath)[1].lower()
             if ext in _OFFICE_EXTS:
                 # 优先读缓存
@@ -1197,12 +1221,12 @@ def exec_tool(name: str, inp: dict) -> str:
             output = f"已写入 {fpath}"
 
         elif name == "list_files":
-            dpath = _safe_path(inp.get("path", ""))
+            dpath = _safe_path(inp.get("path", ""), _allowed)
             entries = sorted(os.listdir(dpath))
             output = "\n".join(entries) if entries else "空目录"
 
         elif name == "glob":
-            base = _safe_path(inp.get("path", ""))
+            base = _safe_path(inp.get("path", ""), _allowed)
             pattern = inp["pattern"]
             matches = sorted(glob_mod.glob(os.path.join(base, pattern), recursive=True))
             rel = [os.path.relpath(m, PROJECT_ROOT) for m in matches]

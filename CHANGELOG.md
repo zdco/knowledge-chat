@@ -45,6 +45,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - 日志分析模式和知识问答模式的浏览器对话历史不再混在一起，localStorage key 加入运行模式区分
 - git clone/fetch HTTP 地址时禁止弹出交互式认证提示（GIT_TERMINAL_PROMPT=0），避免进程卡住，认证失败后自动转 SSH 重试
+- log-analyzer 模式下 search/read_file/list_files/glob 限制在当前 session 的 worktree 和 uploads 目录内，避免跨 session 访问
 - 日志分析模式（log-analyzer）：config.yaml 新增 `mode` 字段切换运行模式，`analyzer` 配置段定义 session/worktree 参数
 - 服务注册表（services.yaml）：定义微服务名称、仓库路径、语言、依赖关系，支持 AI 通过对话自动生成
 - services.yaml `repo` 支持三种格式：本地 git 仓库、远程 git URL（自动 clone）、本地普通目录（自动复制）

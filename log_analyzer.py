@@ -567,6 +567,15 @@ class SessionManager:
         meta = self.get_meta(session_id)
         return meta.get("worktrees", {})
 
+    def get_allowed_paths(self, session_id: str) -> list[str]:
+        """返回当前 session 允许访问的路径列表（uploads + 已加载的 worktree）"""
+        paths = [self.get_uploads_path(session_id)]
+        for wt_info in self.get_loaded_worktrees(session_id).values():
+            wt_path = wt_info.get("path", "")
+            if wt_path:
+                paths.append(wt_path)
+        return paths
+
     def cleanup_session(self, session_id: str):
         """清理 session：移除 worktree + 删除上传文件"""
         meta = self.get_meta(session_id)
