@@ -770,26 +770,24 @@ if APP_MODE == "log-analyzer":
 
 
 def _safe_path(rel: str, allowed_paths: list[str] = None) -> str:
-    """将相对路径转为绝对路径，限制在允许的目录内。
+    """将路径转为安全的绝对路径。
 
     Args:
         rel: 相对或绝对路径
         allowed_paths: 允许访问的目录列表（log-analyzer 模式），为 None 时限制在 PROJECT_ROOT
     """
-    # 如果是绝对路径且有允许列表，直接校验
-    if allowed_paths and os.path.isabs(rel):
-        abs_path = os.path.normpath(rel)
+    if allowed_paths:
+        # log-analyzer 模式：限制在 session 的 worktree + uploads 内
+        if not rel or rel in (".", "/", ""):
+            # 空路径：优先返回第一个 worktree 路径（跳过 uploads）
+            return allowed_paths[-1] if len(allowed_paths) > 1 else allowed_paths[0]
+        abs_path = os.path.normpath(rel) if os.path.isabs(rel) else os.path.normpath(os.path.join(allowed_paths[-1], rel))
         if any(abs_path.startswith(p) for p in allowed_paths):
             return abs_path
-        return allowed_paths[0]  # 不在允许范围内，返回第一个允许路径
+        # 不在允许范围内，返回最后一个 worktree 路径
+        return allowed_paths[-1] if len(allowed_paths) > 1 else allowed_paths[0]
 
     abs_path = os.path.normpath(os.path.join(PROJECT_ROOT, rel))
-
-    if allowed_paths:
-        if any(abs_path.startswith(p) for p in allowed_paths):
-            return abs_path
-        return allowed_paths[0]
-
     if not abs_path.startswith(PROJECT_ROOT):
         return PROJECT_ROOT
     return abs_path
