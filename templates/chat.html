@@ -164,6 +164,7 @@ const userInput=document.getElementById('userInput');
 const sendBtn=document.getElementById('sendBtn');
 let history=[];
 let sending=false;
+let activeReader=null;
 
 // 运行模式
 const APP_MODE='{{ app_mode }}';
@@ -483,11 +484,21 @@ function setToolResult(block,output){
 
 // ── 发送消息 ──────────────────────────────────
 async function sendMessage(){
+  // 如果正在发送，点击则停止
+  if(sending&&activeReader){
+    activeReader.cancel();
+    activeReader=null;
+    sending=false;
+    sendBtn.textContent='发送';
+    if(document.querySelector('.thinking-indicator'))document.querySelector('.thinking-indicator').remove();
+    return;
+  }
   const text=userInput.value.trim();
   const hasFiles=pendingFiles.length>0;
   if((!text&&!hasFiles)||sending)return;
   sending=true;
-  sendBtn.disabled=true;
+  sendBtn.textContent='停止';
+  sendBtn.disabled=false;
   userScrolled=false;
 
   const welcome=document.getElementById('welcome');
@@ -535,6 +546,7 @@ async function sendMessage(){
     }
     const resp=await fetch(BASE_PATH+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const reader=resp.body.getReader();
+    activeReader=reader;
     const decoder=new TextDecoder();
     let buffer='';
     let eventType='';
@@ -607,6 +619,8 @@ async function sendMessage(){
     addMsg('ai','<span style="color:red">请求失败: '+e.message+'</span>');
   }
   sending=false;
+  activeReader=null;
+  sendBtn.textContent='发送';
   sendBtn.disabled=false;
   userInput.focus();
 }
