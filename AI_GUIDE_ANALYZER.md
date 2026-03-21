@@ -157,6 +157,12 @@ git submodule update --init --depth 1
 5. 接口定义文件（`*.proto`、`*.thrift`、OpenAPI/Swagger）
 6. 目录结构和模块划分
 
+**排除目录**：以下目录中的代码不代表服务本身的行为，扫描时必须跳过：
+- `example/`、`examples/`、`sample/`、`samples/`
+- `test/`、`tests/`、`unittest/`
+- `demo/`、`doc/`、`docs/`
+- `benchmark/`、`tools/`（辅助脚本）
+
 **描述示例**：
 
 ```
