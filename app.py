@@ -170,7 +170,10 @@ if APP_MODE == "log-analyzer":
                 continue
 
             # 保存文件
-            safe_name = f.filename.replace("/", "_").replace("\\", "_")
+            from werkzeug.utils import secure_filename
+            safe_name = secure_filename(f.filename)
+            if not safe_name:
+                safe_name = f"upload_{uuid.uuid4().hex[:8]}"
             save_path = os.path.join(uploads_dir, safe_name)
             f.save(save_path)
 

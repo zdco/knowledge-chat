@@ -14,6 +14,10 @@ from datetime import datetime
 
 import yaml
 
+# tarfile.extractall filter 参数兼容（Python 3.11.4+ 支持）
+import inspect as _inspect
+_TAR_EXTRACT_KWARGS = {"filter": "data"} if "filter" in _inspect.signature(tarfile.TarFile.extractall).parameters else {}
+
 logger = logging.getLogger(__name__)
 
 
@@ -345,7 +349,7 @@ class SessionManager:
                 zf.extractall(wt_path)
         elif name_lower.endswith(('.tar.gz', '.tgz', '.tar')):
             with tarfile.open(archive_path, 'r:*') as tf:
-                tf.extractall(wt_path, filter='data')
+                tf.extractall(wt_path, **_TAR_EXTRACT_KWARGS)
         else:
             raise RuntimeError(f"不支持的压缩格式: {archive_path}")
 
@@ -498,7 +502,7 @@ def process_upload(filepath: str, uploads_dir: str) -> list[str]:
             extract_dir = filepath + "_extracted"
             os.makedirs(extract_dir, exist_ok=True)
             with tarfile.open(filepath, 'r:*') as tf:
-                tf.extractall(extract_dir, filter='data')
+                tf.extractall(extract_dir, **_TAR_EXTRACT_KWARGS)
             for root, dirs, files in os.walk(extract_dir):
                 for f in files:
                     results.append(os.path.join(root, f))
