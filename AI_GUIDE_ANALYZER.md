@@ -6,7 +6,7 @@
 
 - 用户要求添加/注册服务
 - 用户要求配置日志分析系统
-- 用户描述了业务架构或服务依赖关系
+- 用户提供了一批仓库地址要求批量注册
 
 ## 引导策略
 
@@ -14,31 +14,29 @@
 
 ### 场景一：用户要批量注册多个服务
 
-先引导用户描述整体业务架构，再一次性生成所有配置。示例引导：
+先引导用户提供仓库地址列表和业务线归属，AI 自动识别语言、生成描述。示例引导：
 
 ```
-为了帮你一次性配置好所有服务和依赖关系，你可以先描述一下整体业务架构，比如：
+为了帮你一次性配置好所有服务，你可以提供以下信息：
 
-1. 你们有哪些业务线？（如行情、复盘、指标、盯盘等）
-2. 每个业务线包含哪些服务？
-3. 服务之间的调用关系是怎样的？（谁调用谁）
-4. 有没有跨业务线的共享服务？
+1. 每个服务的代码地址（GitLab 链接即可）
+2. 这些服务属于哪个业务线？（如行情、复盘、指标等）
 
-不需要很精确，大致的调用方向说清楚就行，比如：
-"行情网关 → 行情分发 → 行情缓存，复盘引擎调用数据查询服务获取历史数据"
+不需要梳理依赖关系，AI 在排查问题时会从代码中自动发现。
 
-然后每个服务给我代码地址（GitLab 链接即可），我来生成完整配置。
+示例：
+行情业务：
+- 行情网关：http://gitlab.xxx/group/market_gateway/tree/dev
+- 数据服务：http://gitlab.xxx/group/data_server/tree/dev
+复盘业务：
+- 复盘引擎：http://gitlab.xxx/group/replay_engine/tree/dev
 ```
 
-用户描述完架构后，一次性生成所有服务的 `services.yaml` 配置，包括 `depends_on`。
+用户提供信息后，一次性生成所有服务的 `services.yaml` 配置，包括 `businesses` 分组。
 
 ### 场景二：用户只注册单个服务
 
-直接收集该服务的信息，按下方流程操作。依赖关系如果用户不清楚，先留空，后续可以补充。
-
-### 场景三：用户已有服务，要补充依赖关系
-
-用 `switch_service` 加载服务代码，搜索 RPC 调用、配置文件中的服务地址、import 的 client 包等线索，推断依赖关系，更新 `depends_on`。
+直接收集该服务的信息，按下方流程操作。
 
 ## 单个服务注册流程
 
@@ -49,25 +47,31 @@
 - **服务 ID**：英文标识符，如 `market_gateway`
 - **服务名称**：中文显示名，如 "行情网关"
 - **代码地址**：GitLab/GitHub 页面链接、git 仓库地址、或本地路径
+- **业务线**：该服务属于哪个业务线（可选，用于 businesses 分组）
 - **编程语言**：如果用户没说，注册后通过 `switch_service` 加载代码再识别
-- **依赖服务**：上下游服务列表
 - **服务描述**：一句话说明服务职责
+- **别名**（可选）：服务的其他名称，用于模糊匹配
 - **客户仓库**（可选）：如果不同客户的代码在不同仓库，询问客户名和对应地址
 
 不需要单独问子路径和分支 — 如果用户提供的是 GitLab 页面链接（如 `http://gitlab.xxx/group/project/tree/dev/some/path`），系统会自动解析出仓库地址、分支和子路径。
 
 ### 第二步：写入 services.yaml
 
-用 `read_file` 读取当前 `services.yaml`，在 `services:` 下追加新服务配置：
+用 `read_file` 读取当前 `services.yaml`，追加配置：
 
 ```yaml
+businesses:
+  行情业务:
+    - market_gateway
+    - data_server
+
 services:
-  <service_id>:
-    name: "<中文名称>"
-    repo: "<代码地址>"              # 直接粘贴用户提供的地址即可
-    language: "<语言>"
-    depends_on: [<依赖服务ID列表>]
-    description: "<服务描述>"
+  market_gateway:
+    name: "行情网关"
+    repo: "<代码地址>"
+    language: "C++"
+    description: "接收交易所行情数据并分发"
+    aliases: ["MarketGateway"]
 ```
 
 如果不同客户的代码在不同仓库，加上 `client_repos`：
@@ -81,8 +85,7 @@ services:
 ### 第三步：验证
 
 1. 用 `read_file` 读取写入后的文件，确认 YAML 格式正确
-2. 如果有 `depends_on`，确认依赖的服务已注册（未注册的提醒用户后续添加）
-3. 如果用户提供了本地路径，用 `list_files` 确认路径存在
+2. 如果用户提供了本地路径，用 `list_files` 确认路径存在
 
 ### 第四步：扫描代码（可选）
 
@@ -142,6 +145,6 @@ switch_service(service="trade_engine", version="v2.3.1", client="客户A")
 ## 注意事项
 
 - 服务 ID 使用小写字母和下划线，如 `market_gateway`
-- `depends_on` 中的 ID 必须与其他服务的 ID 一致
 - description 要简洁明了，说明服务的核心职责
 - 远程 git URL 需要服务器有访问权限（SSH key 或 HTTPS token）
+- 不需要手动维护依赖关系，AI 在排查问题时用 `scan_service` 从代码中实时发现

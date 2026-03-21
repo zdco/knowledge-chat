@@ -54,14 +54,16 @@ APP_MODE = CONFIG.get("mode", "knowledge")
 # ── 日志分析模式初始化 ────────────────────────────────────
 _session_manager = None
 _analyzer_services = {}
+_analyzer_businesses = {}
 
 if APP_MODE == "log-analyzer":
-    from log_analyzer import SessionManager, load_services_config, get_dependency_tree, \
-        read_log_filtered, extract_log_summary, process_upload, is_image_file
+    from log_analyzer import SessionManager, load_services_config, load_businesses_config, \
+        scan_service_deps, read_log_filtered, extract_log_summary, process_upload, is_image_file
 
     _analyzer_cfg = CONFIG.get("analyzer", {})
     _services_config_path = os.path.join(_DIR, _analyzer_cfg.get("services_config", "services.yaml"))
     _analyzer_services = load_services_config(_services_config_path)
+    _analyzer_businesses = load_businesses_config(_services_config_path)
     _session_manager = SessionManager(
         session_dir=_analyzer_cfg.get("session_dir", "/data/sessions"),
         worktree_base=_analyzer_cfg.get("worktree_base", "/data/worktrees"),
@@ -377,7 +379,7 @@ def _build_analyzer_prompt(session_id: str = None) -> str:
         "能力：",
         "- 分析日志文件，提取关键错误信息",
         "- 阅读服务源代码，定位问题代码",
-        "- 沿服务依赖链追踪上下游问题",
+        "- 扫描代码发现服务间依赖关系",
         "- 识别日志截图中的内容",
         "",
         "分析流程：",
@@ -386,8 +388,9 @@ def _build_analyzer_prompt(session_id: str = None) -> str:
         "3. 如果用户提供了截图，直接从图片中提取关键信息",
         "4. 用 switch_service 加载相关服务代码（需要时指定版本）",
         "5. 用 search/read_file 在代码中定位问题",
-        "6. 如果涉及依赖服务，用 trace_dependency 查看依赖链，必要时加载依赖服务代码",
-        "7. 信息不足时，明确告知用户需要补充什么：",
+        "6. 如果需要了解服务间依赖关系，用 scan_service 扫描代码中的依赖线索",
+        "7. 从日志中的关键词（服务名、错误码、IP:端口）自动关联相关服务",
+        "8. 信息不足时，明确告知用户需要补充什么：",
         "   - 哪个服务的日志",
         "   - 什么时间段",
         "   - 什么版本",
@@ -395,24 +398,52 @@ def _build_analyzer_prompt(session_id: str = None) -> str:
         "",
         "服务管理：",
         f"- 当用户要求添加/注册服务时，先用 read_file 读取 {os.path.join(PROJECT_ROOT, 'AI_GUIDE_ANALYZER.md')} 获取完整流程",
-        "- 按照指南扫描分析代码仓库、生成 services.yaml 配置",
+        "- 按照指南收集信息、生成 services.yaml 配置",
         "",
     ]
 
-    # 已注册服务列表
+    # 按业务线分组显示已注册服务
     if _analyzer_services:
         parts.append("已注册服务：")
-        for sid, svc in _analyzer_services.items():
-            deps = svc.get("depends_on") or []
-            deps_str = f" → 依赖: {', '.join(deps)}" if deps else ""
-            aliases = svc.get("aliases") or []
-            alias_str = f" (别名: {', '.join(aliases)})" if aliases else ""
-            parts.append(f"  • {svc.get('name', sid)} ({sid}){alias_str} [{svc.get('language', '?')}]{deps_str}")
-            if svc.get("description"):
-                parts.append(f"    {svc['description']}")
-            client_repos = svc.get("client_repos") or {}
-            if client_repos:
-                parts.append(f"    已配置客户: {', '.join(client_repos.keys())}（用户提到客户名时，用 switch_service 的 client 参数指定）")
+        # 如果有业务线分组，按业务线显示
+        if _analyzer_businesses:
+            # 收集已分组的服务 ID
+            grouped_sids = set()
+            for biz_name, sids in _analyzer_businesses.items():
+                parts.append(f"  【{biz_name}】")
+                for sid in sids:
+                    grouped_sids.add(sid)
+                    svc = _analyzer_services.get(sid)
+                    if svc:
+                        aliases = svc.get("aliases") or []
+                        alias_str = f" (别名: {', '.join(aliases)})" if aliases else ""
+                        parts.append(f"    • {svc.get('name', sid)} ({sid}){alias_str} [{svc.get('language', '?')}]")
+                        if svc.get("description"):
+                            parts.append(f"      {svc['description']}")
+                    else:
+                        parts.append(f"    • {sid}（未注册）")
+            # 未分组的服务
+            ungrouped = [sid for sid in _analyzer_services if sid not in grouped_sids]
+            if ungrouped:
+                parts.append(f"  【未分组】")
+                for sid in ungrouped:
+                    svc = _analyzer_services[sid]
+                    aliases = svc.get("aliases") or []
+                    alias_str = f" (别名: {', '.join(aliases)})" if aliases else ""
+                    parts.append(f"    • {svc.get('name', sid)} ({sid}){alias_str} [{svc.get('language', '?')}]")
+                    if svc.get("description"):
+                        parts.append(f"      {svc['description']}")
+        else:
+            # 无业务线分组，平铺显示
+            for sid, svc in _analyzer_services.items():
+                aliases = svc.get("aliases") or []
+                alias_str = f" (别名: {', '.join(aliases)})" if aliases else ""
+                parts.append(f"  • {svc.get('name', sid)} ({sid}){alias_str} [{svc.get('language', '?')}]")
+                if svc.get("description"):
+                    parts.append(f"    {svc['description']}")
+                client_repos = svc.get("client_repos") or {}
+                if client_repos:
+                    parts.append(f"    已配置客户: {', '.join(client_repos.keys())}（用户提到客户名时，用 switch_service 的 client 参数指定）")
     else:
         parts.append("暂无已注册服务，用户可通过对话添加。")
 
@@ -684,13 +715,12 @@ _ANALYZER_TOOLS = [
         },
     },
     {
-        "name": "trace_dependency",
-        "description": "查询服务依赖链，显示上下游服务关系。",
+        "name": "scan_service",
+        "description": "扫描服务代码，发现依赖关系线索（配置文件中的服务引用、RPC接口定义、构建文件依赖等）。需要先用 switch_service 加载服务代码。",
         "input_schema": {
             "type": "object",
             "properties": {
                 "service": {"type": "string", "description": "服务 ID"},
-                "depth": {"type": "integer", "description": "追踪深度，默认 2"},
             },
             "required": ["service"],
         },
@@ -710,7 +740,7 @@ _ANALYZER_TOOLS = [
     },
     {
         "name": "list_services",
-        "description": "列出所有已注册的服务及其依赖关系。",
+        "description": "列出所有已注册的服务，按业务线分组显示。",
         "input_schema": {
             "type": "object",
             "properties": {},
@@ -723,7 +753,7 @@ if APP_MODE == "log-analyzer":
     # 扩展必填参数映射
     _REQUIRED_FIELDS_EXTRA = {
         "read_log": ["file"],
-        "trace_dependency": ["service"],
+        "scan_service": ["service"],
         "switch_service": ["service"],
     }
 
@@ -1248,31 +1278,28 @@ def exec_tool(name: str, inp: dict) -> str:
                 tail=inp.get("tail"),
             )
 
-        elif name == "trace_dependency" and APP_MODE == "log-analyzer":
+        elif name == "scan_service" and APP_MODE == "log-analyzer":
             service_id = inp["service"]
             # 支持别名查找
-            resolved_id, _ = _find_service(service_id)
+            resolved_id, svc = _find_service(service_id)
             if resolved_id:
                 service_id = resolved_id
-            depth = inp.get("depth", 2)
-            tree = get_dependency_tree(_analyzer_services, service_id, depth)
-            if not tree:
-                output = f"未找到服务: {service_id}"
+            if not svc:
+                output = f"未找到服务: {inp['service']}，请用 list_services 查看已注册服务"
             else:
-                # 格式化依赖树
                 session_id = inp.get("_session_id", "")
-                loaded_wts = {}
-                if session_id and _session_manager:
+                if not session_id or not _session_manager:
+                    output = "无法扫描服务代码：缺少 session 信息"
+                else:
                     loaded_wts = _session_manager.get_loaded_worktrees(session_id)
-                lines = []
-                for node in tree:
-                    indent = "  " * node["depth"]
-                    loaded = "✅ 已加载" if node["id"] in loaded_wts else "⬜ 未加载"
-                    deps_str = f" → 依赖: {', '.join(node['depends_on'])}" if node["depends_on"] else ""
-                    lines.append(f"{indent}{node['name']} ({node['id']}) [{loaded}]{deps_str}")
-                    if node["description"] and node["description"] != "(未注册)":
-                        lines.append(f"{indent}  {node['description']}")
-                output = "\n".join(lines)
+                    wt_info = loaded_wts.get(service_id)
+                    if not wt_info:
+                        output = f"服务 {service_id} 的代码尚未加载，请先用 switch_service 加载"
+                    else:
+                        code_path = wt_info.get("path", "")
+                        sub_path = wt_info.get("sub_path")
+                        scan_path = os.path.join(code_path, sub_path) if sub_path else code_path
+                        output = scan_service_deps(scan_path, _analyzer_services)
 
         elif name == "switch_service" and APP_MODE == "log-analyzer":
             service_id = inp["service"]
@@ -1318,21 +1345,59 @@ def exec_tool(name: str, inp: dict) -> str:
                 output = "暂无已注册服务，请先配置 services.yaml"
             else:
                 lines = []
-                for sid, svc in _analyzer_services.items():
-                    deps = svc.get("depends_on") or []
-                    deps_str = f"依赖: {', '.join(deps)}" if deps else "无依赖"
-                    aliases = svc.get("aliases") or []
-                    alias_str = f" (别名: {', '.join(aliases)})" if aliases else ""
-                    lines.append(f"• {svc.get('name', sid)} ({sid}){alias_str}")
-                    lines.append(f"  语言: {svc.get('language', '未知')} | {deps_str}")
-                    lines.append(f"  {svc.get('description', '')}")
-                    lines.append(f"  默认仓库: {svc.get('repo', '')}")
-                    if svc.get("sub_path"):
-                        lines.append(f"  子路径: {svc['sub_path']}")
-                    client_repos = svc.get("client_repos") or {}
-                    if client_repos:
-                        lines.append(f"  已配置客户: {', '.join(client_repos.keys())}")
-                    lines.append("")
+                if _analyzer_businesses:
+                    grouped_sids = set()
+                    for biz_name, sids in _analyzer_businesses.items():
+                        lines.append(f"【{biz_name}】")
+                        for sid in sids:
+                            grouped_sids.add(sid)
+                            svc = _analyzer_services.get(sid)
+                            if svc:
+                                aliases = svc.get("aliases") or []
+                                alias_str = f" (别名: {', '.join(aliases)})" if aliases else ""
+                                lines.append(f"  • {svc.get('name', sid)} ({sid}){alias_str}")
+                                lines.append(f"    语言: {svc.get('language', '未知')}")
+                                lines.append(f"    {svc.get('description', '')}")
+                                lines.append(f"    默认仓库: {svc.get('repo', '')}")
+                                if svc.get("sub_path"):
+                                    lines.append(f"    子路径: {svc['sub_path']}")
+                                client_repos = svc.get("client_repos") or {}
+                                if client_repos:
+                                    lines.append(f"    已配置客户: {', '.join(client_repos.keys())}")
+                            else:
+                                lines.append(f"  • {sid}（未注册）")
+                            lines.append("")
+                    ungrouped = [sid for sid in _analyzer_services if sid not in grouped_sids]
+                    if ungrouped:
+                        lines.append("【未分组】")
+                        for sid in ungrouped:
+                            svc = _analyzer_services[sid]
+                            aliases = svc.get("aliases") or []
+                            alias_str = f" (别名: {', '.join(aliases)})" if aliases else ""
+                            lines.append(f"  • {svc.get('name', sid)} ({sid}){alias_str}")
+                            lines.append(f"    语言: {svc.get('language', '未知')}")
+                            lines.append(f"    {svc.get('description', '')}")
+                            lines.append(f"    默认仓库: {svc.get('repo', '')}")
+                            if svc.get("sub_path"):
+                                lines.append(f"    子路径: {svc['sub_path']}")
+                            client_repos = svc.get("client_repos") or {}
+                            if client_repos:
+                                lines.append(f"    已配置客户: {', '.join(client_repos.keys())}")
+                            lines.append("")
+                else:
+                    for sid, svc in _analyzer_services.items():
+                        aliases = svc.get("aliases") or []
+                        alias_str = f" (别名: {', '.join(aliases)})" if aliases else ""
+                        lines.append(f"• {svc.get('name', sid)} ({sid}){alias_str}")
+                        lines.append(f"  语言: {svc.get('language', '未知')}")
+                        lines.append(f"  {svc.get('description', '')}")
+                        lines.append(f"  默认仓库: {svc.get('repo', '')}")
+                        if svc.get("sub_path"):
+                            lines.append(f"  子路径: {svc['sub_path']}")
+                        client_repos = svc.get("client_repos") or {}
+                        if client_repos:
+                            lines.append(f"  已配置客户: {', '.join(client_repos.keys())}")
+                        lines.append("")
                 output = "\n".join(lines)
 
         else:

@@ -7,6 +7,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- services.yaml 新增 `businesses` 段：按业务线对服务分组（纯标签，不影响逻辑）
+- 新增 `scan_service` 工具：扫描服务代码中的依赖线索（配置文件、RPC 接口定义、构建文件、代码引用），与已注册服务交叉匹配，替代静态 `depends_on`
+- `list_services` 工具输出按业务线分组显示
+- `load_businesses_config()` 函数：加载 services.yaml 中的业务线分组配置
+
+### Changed
+- services.yaml 去掉 `depends_on` 字段，依赖关系由 AI 通过 `scan_service` 从代码中实时发现
+- AI_GUIDE_ANALYZER.md 简化注册流程：用户只需提供仓库地址列表和业务线归属，不需要梳理依赖关系
+- system prompt 不再列出静态依赖关系，改为按业务线列出服务清单，引导 AI 用 `scan_service` 发现依赖
+
+### Removed
+- 移除 `trace_dependency` 工具和 `get_dependency_tree()` 函数（被 `scan_service` 替代）
+
+### Fixed
 - 日志分析模式（log-analyzer）：config.yaml 新增 `mode` 字段切换运行模式，`analyzer` 配置段定义 session/worktree 参数
 - 服务注册表（services.yaml）：定义微服务名称、仓库路径、语言、依赖关系，支持 AI 通过对话自动生成
 - services.yaml `repo` 支持三种格式：本地 git 仓库、远程 git URL（自动 clone）、本地普通目录（自动复制）

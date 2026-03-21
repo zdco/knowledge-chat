@@ -2,21 +2,31 @@
 # 通过对话让 AI 自动生成，或手动编辑
 # 使用方法：参考 AI_GUIDE_ANALYZER.md
 
+# ── 业务线分组（纯标签，方便查找）──────────────────
+# businesses:
+#   行情业务:
+#     - market_gateway
+#     - data_server
+#     - hq_cache_server
+#   复盘业务:
+#     - replay_engine
+#   指标业务:
+#     - indicator_calc
+
 services:
   # ── 示例 1：基本配置 ────────────────────────────
   # market_gateway:
   #   name: "行情网关"
   #   repo: "/data/repos/market_gateway"
   #   language: "C++"
-  #   depends_on: [data_server, config_center]
   #   description: "接收交易所行情数据并分发"
+  #   aliases: ["MarketGateway", "HQGateway"]
 
   # ── 示例 2：不同客户对应不同 git 仓库 ──────────
   # trade_engine:
   #   name: "交易引擎"
   #   repo: "https://new-gitlab.example.com/trading/engine.git"   # 默认仓库（最新）
   #   language: "C++"
-  #   depends_on: [risk_control, market_gateway]
   #   description: "核心交易撮合引擎"
   #   client_repos:
   #     客户A: "https://old-gitlab.example.com/legacy/trade-engine.git"
@@ -31,27 +41,37 @@ services:
   #   name: "数据查询服务"
   #   repo: "http://gitlab.whup.com/UPService-HQSystem/Data_Servers/tree/dev/DbQueryServer"
   #   language: "C++"
-  #   depends_on: []
   #   description: "数据查询服务"
 
-  # ── 示例 3：monorepo 子路径 ────────────────────
+  # ── 示例 4：monorepo 子路径 ────────────────────
   # data_server:
   #   name: "数据服务"
   #   repo: "/data/repos/monorepo"
   #   sub_path: "services/data_server"
   #   language: "Java"
-  #   depends_on: [database]
   #   description: "数据存储和查询服务"
 
-  # ── 示例 4：远程 git 仓库（自动 clone）─────────
+  # ── 示例 5：远程 git 仓库（自动 clone）─────────
   # auth_service:
   #   name: "认证服务"
   #   repo: "https://gitlab.example.com/backend/auth.git"
   #   language: "Java"
-  #   depends_on: []
   #   description: "用户认证和权限管理"
 
 # ── 配置说明 ──────────────────────────────────────
+#
+# businesses（可选）：按业务线对服务分组，纯标签不影响逻辑
+#
+# services 每个服务支持的字段：
+#   name:         中文显示名
+#   repo:         代码地址（本地路径 / 远程 git URL / GitLab 页面链接）
+#   language:     编程语言
+#   description:  一句话描述服务职责
+#   aliases:      服务别名列表，用于模糊匹配
+#   sub_path:     monorepo 中的子路径
+#   client_repos: 不同客户的代码仓库映射
+#
+# 依赖关系不需要手动维护，AI 在排查问题时会用 scan_service 从代码中实时发现
 #
 # repo 支持三种格式：
 #   1. 本地 git 仓库路径

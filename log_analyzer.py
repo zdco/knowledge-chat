@@ -60,7 +60,7 @@ def parse_repo_url(url: str) -> tuple[str, str | None, str | None]:
 # ── 服务注册表 ────────────────────────────────────────────
 
 def load_services_config(config_path: str) -> dict:
-    """加载 services.yaml，返回 services 字典"""
+    """加载 services.yaml，返回 {services: dict, businesses: dict}"""
     if not os.path.isfile(config_path):
         return {}
     with open(config_path, "r", encoding="utf-8") as f:
@@ -68,32 +68,187 @@ def load_services_config(config_path: str) -> dict:
     return data.get("services") or {}
 
 
-def get_dependency_tree(services: dict, service_id: str, depth: int = 2) -> list[dict]:
-    """获取服务依赖树，返回 [{id, name, description, depth, depends_on}]"""
-    result = []
-    visited = set()
+def load_businesses_config(config_path: str) -> dict:
+    """加载 services.yaml 中的 businesses 业务线分组"""
+    if not os.path.isfile(config_path):
+        return {}
+    with open(config_path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    return data.get("businesses") or {}
 
-    def _walk(sid: str, current_depth: int):
-        if sid in visited or current_depth > depth:
-            return
-        visited.add(sid)
-        svc = services.get(sid)
-        if not svc:
-            result.append({"id": sid, "name": sid, "description": "(未注册)", "depth": current_depth, "depends_on": []})
-            return
-        deps = svc.get("depends_on") or []
-        result.append({
-            "id": sid,
-            "name": svc.get("name", sid),
-            "description": svc.get("description", ""),
-            "depth": current_depth,
-            "depends_on": deps,
-        })
-        for dep_id in deps:
-            _walk(dep_id, current_depth + 1)
 
-    _walk(service_id, 0)
-    return result
+def scan_service_deps(code_path: str, all_services: dict) -> str:
+    """扫描服务代码目录，发现依赖关系线索。
+
+    扫描策略：
+    1. 配置文件（.yaml/.yml/.xml/.conf/.properties/.ini/.json）中的服务名、host、port
+    2. RPC/接口定义文件（.proto/.thrift/.jce）中的 service 定义和 import
+    3. 构建文件（CMakeLists.txt/pom.xml/build.gradle/package.json/go.mod）中的模块依赖
+    4. 代码中的 #include、import 引用路径
+    5. 与已注册服务列表交叉匹配
+    """
+    import glob as _glob
+
+    if not os.path.isdir(code_path):
+        return f"目录不存在: {code_path}"
+
+    # 构建服务关键词集合：ID、name、aliases
+    service_keywords = {}  # keyword_lower -> (service_id, match_type)
+    for sid, svc in all_services.items():
+        service_keywords[sid.lower()] = (sid, "ID")
+        name = svc.get("name", "")
+        if name:
+            service_keywords[name.lower()] = (sid, "名称")
+        for alias in (svc.get("aliases") or []):
+            service_keywords[alias.lower()] = (sid, "别名")
+
+    findings = []  # [(category, file_rel, detail, matched_services)]
+
+    def _rel(path):
+        return os.path.relpath(path, code_path)
+
+    def _search_file_for_services(filepath, category):
+        """在文件内容中搜索已注册服务的关键词"""
+        try:
+            with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+        except Exception:
+            return
+        content_lower = content.lower()
+        matched = {}
+        for kw, (sid, match_type) in service_keywords.items():
+            # 至少 3 个字符才匹配，避免误命中
+            if len(kw) < 3:
+                continue
+            if kw in content_lower:
+                if sid not in matched:
+                    matched[sid] = match_type
+        if matched:
+            matches_desc = ", ".join(f"{sid}({mt})" for sid, mt in matched.items())
+            findings.append((category, _rel(filepath), matches_desc, set(matched.keys())))
+
+    # 1. 扫描配置文件
+    config_patterns = ['**/*.yaml', '**/*.yml', '**/*.xml', '**/*.conf',
+                       '**/*.properties', '**/*.ini', '**/*.json']
+    config_files = set()
+    for pat in config_patterns:
+        for fp in _glob.glob(os.path.join(code_path, pat), recursive=True):
+            # 跳过 node_modules、.git 等
+            if '/.git/' in fp or '/node_modules/' in fp or '/.text_cache/' in fp:
+                continue
+            config_files.add(fp)
+    for fp in config_files:
+        _search_file_for_services(fp, "配置文件")
+
+    # 2. 扫描 RPC/接口定义文件
+    rpc_patterns = ['**/*.proto', '**/*.thrift', '**/*.jce']
+    rpc_files = set()
+    for pat in rpc_patterns:
+        for fp in _glob.glob(os.path.join(code_path, pat), recursive=True):
+            if '/.git/' in fp:
+                continue
+            rpc_files.add(fp)
+    for fp in rpc_files:
+        _search_file_for_services(fp, "RPC/接口定义")
+
+    # 同时提取 proto/thrift/jce 中的 service 定义
+    _svc_def_re = re.compile(r'(?:service|interface)\s+(\w+)', re.IGNORECASE)
+    for fp in rpc_files:
+        try:
+            with open(fp, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            for m in _svc_def_re.finditer(content):
+                findings.append(("RPC服务定义", _rel(fp), f"service {m.group(1)}", set()))
+        except Exception:
+            pass
+
+    # 3. 扫描构建文件
+    build_filenames = ['CMakeLists.txt', 'pom.xml', 'build.gradle', 'build.gradle.kts',
+                       'package.json', 'go.mod', 'Makefile', 'BUILD', 'WORKSPACE']
+    for root, dirs, files in os.walk(code_path):
+        dirs[:] = [d for d in dirs if d not in ('.git', 'node_modules', '.text_cache')]
+        for fname in files:
+            if fname in build_filenames:
+                fp = os.path.join(root, fname)
+                _search_file_for_services(fp, "构建文件")
+
+    # 4. 扫描代码中的 include/import（只看前 50 行，提高效率）
+    code_patterns = ['**/*.cpp', '**/*.h', '**/*.hpp', '**/*.cc',
+                     '**/*.java', '**/*.go', '**/*.py', '**/*.cs']
+    _include_re = re.compile(r'(?:#include|import|using|require)\s+[<"\'](.*?)[>"\']')
+    code_files = set()
+    for pat in code_patterns:
+        for fp in _glob.glob(os.path.join(code_path, pat), recursive=True):
+            if '/.git/' in fp or '/node_modules/' in fp:
+                continue
+            code_files.add(fp)
+    for fp in code_files:
+        try:
+            with open(fp, "r", encoding="utf-8", errors="replace") as f:
+                head_lines = []
+                for i, line in enumerate(f):
+                    if i >= 50:
+                        break
+                    head_lines.append(line)
+            head_content = "".join(head_lines).lower()
+            matched = {}
+            for kw, (sid, match_type) in service_keywords.items():
+                if len(kw) < 3:
+                    continue
+                if kw in head_content:
+                    if sid not in matched:
+                        matched[sid] = match_type
+            if matched:
+                matches_desc = ", ".join(f"{sid}({mt})" for sid, mt in matched.items())
+                findings.append(("代码引用", _rel(fp), matches_desc, set(matched.keys())))
+        except Exception:
+            pass
+
+    # 汇总结果
+    if not findings:
+        return "未发现与已注册服务相关的依赖线索。可以尝试手动搜索配置文件中的 host/port 或服务名。"
+
+    # 按匹配到的服务聚合
+    dep_services = {}  # sid -> [(category, file, detail)]
+    other_findings = []  # 没有匹配到具体服务的发现（如 RPC 定义）
+    for category, file_rel, detail, matched_sids in findings:
+        if matched_sids:
+            for sid in matched_sids:
+                dep_services.setdefault(sid, []).append((category, file_rel, detail))
+        else:
+            other_findings.append((category, file_rel, detail))
+
+    lines = []
+    if dep_services:
+        lines.append(f"发现 {len(dep_services)} 个可能的依赖服务：")
+        lines.append("")
+        for sid, refs in dep_services.items():
+            svc = all_services.get(sid, {})
+            svc_name = svc.get("name", sid)
+            lines.append(f"  ▸ {svc_name} ({sid})")
+            # 去重，最多显示 5 条
+            seen = set()
+            count = 0
+            for category, file_rel, detail in refs:
+                key = (category, file_rel)
+                if key in seen:
+                    continue
+                seen.add(key)
+                lines.append(f"    [{category}] {file_rel}")
+                count += 1
+                if count >= 5:
+                    remaining = len(refs) - count
+                    if remaining > 0:
+                        lines.append(f"    ... 还有 {remaining} 处引用")
+                    break
+            lines.append("")
+
+    if other_findings:
+        lines.append("其他发现：")
+        for category, file_rel, detail in other_findings[:20]:
+            lines.append(f"  [{category}] {file_rel}: {detail}")
+
+    return "\n".join(lines)
 
 
 # ── Session 管理 ──────────────────────────────────────────
