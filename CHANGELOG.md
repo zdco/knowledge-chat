@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- AI_GUIDE_ANALYZER.md 重写批量注册流程：用户提供仓库地址列表 + 补充信息，AI 自动 clone 代码扫描识别语言/框架/描述，生成完整 services.yaml
+- AI_GUIDE_ANALYZER.md 新增单个仓库扫描识别规则：按构建文件识别语言、按优先级提取服务名称和描述，覆盖 C++/Java/Go/Rust/Python/C#/JS/TS 等常见语言
+- AI_GUIDE_ANALYZER.md 简化单个服务注册流程：去掉手动收集信息步骤，改为 clone 扫描后自动生成配置
+
 ### Added
 - services.yaml 新增 `businesses` 段：按业务线对服务分组（纯标签，不影响逻辑）
 - 新增 `scan_service` 工具：扫描服务代码中的依赖线索（配置文件、RPC 接口定义、构建文件、代码引用），与已注册服务交叉匹配，替代静态 `depends_on`
