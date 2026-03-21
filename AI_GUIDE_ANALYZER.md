@@ -54,28 +54,7 @@
 
 拿到仓库地址后，执行以下步骤自动识别服务信息：
 
-### 第一步：Clone 代码
-
-```bash
-git clone <仓库地址> /tmp/<服务ID> --depth 1 --branch <分支>
-cd /tmp/<服务ID>
-git submodule update --init --depth 1
-```
-
-- 如果 URL 中包含分支信息（如 `/tree/dev`），用该分支；否则用默认分支
-- `--depth 1` 只拉最新一次提交，节省时间
-- 始终 clone 整个仓库，即使 URL 包含子路径（如 `/tree/dev/DbQueryServer`）
-- 初始化 submodule，部分项目的依赖库在 submodule 中
-
-**扫描范围**：以子路径为主入口，但同时检查仓库根目录的以下内容：
-- 根目录的构建文件（如顶层 `CMakeLists.txt` 可能定义全局编译选项和依赖）
-- `lib/`、`third_party/`、`deps/`、`external/` 等公共依赖目录
-- `.gitmodules`（了解 submodule 依赖）
-- 根目录的 `README.md`（可能包含整体项目说明）
-
-这样即使服务代码在子目录，也不会漏掉上级目录的依赖信息和构建配置。
-
-### 第二步：推断服务 ID 和自动生成别名
+### 第一步：推断服务 ID 和自动生成别名
 
 **服务 ID**：从 URL 的仓库名或子路径取，转为 `snake_case`
 
@@ -97,9 +76,30 @@ git submodule update --init --depth 1
 
 用户额外提供的别名（如中文名、缩写）追加到自动生成的别名之后。
 
+### 第二步：Clone 代码
+
+```bash
+git clone <仓库地址> /tmp/<服务ID> --depth 1 --branch <分支>
+cd /tmp/<服务ID>
+git submodule update --init --depth 1
+```
+
+- 如果 URL 中包含分支信息（如 `/tree/dev`），用该分支；否则不加 `--branch`，使用默认分支
+- `--depth 1` 只拉最新一次提交，节省时间
+- 始终 clone 整个仓库，即使 URL 包含子路径（如 `/tree/dev/DbQueryServer`）
+- 初始化 submodule，部分项目的依赖库在 submodule 中
+
+**扫描范围**：以子路径为主入口，但同时检查仓库根目录的以下内容（后续各步骤均遵循此范围）：
+- 根目录的构建文件（如顶层 `CMakeLists.txt` 可能定义全局编译选项和依赖）
+- `lib/`、`third_party/`、`deps/`、`external/` 等公共依赖目录
+- `.gitmodules`（了解 submodule 依赖）
+- 根目录的 `README.md`（可能包含整体项目说明）
+
+这样即使服务代码在子目录，也不会漏掉上级目录的依赖信息和构建配置。
+
 ### 第三步：识别编程语言
 
-按构建文件判断，检查子路径目录和仓库根目录下是否存在以下文件：
+按构建文件判断：
 
 | 构建文件 | 语言 | 框架线索 |
 |----------|------|----------|
@@ -126,6 +126,8 @@ git submodule update --init --depth 1
 5. `build.gradle` 的 `rootProject.name`
 6. `Cargo.toml` 的 `[package] name`
 7. 以上都找不到 → 留空，让用户补充
+
+注意：如果提取到的名称是英文（如 `Market Gateway`），仅作为参考放入 aliases，`name` 字段留空让用户补充中文显示名。
 
 ### 第五步：提取服务描述
 
@@ -164,14 +166,6 @@ services:
     aliases: ["MarketGateway", "HQGateway"]
     client_repos:
       客户A: "http://old-gitlab.whup.com/legacy/market_gateway/tree/master"
-```
-
-如果不同客户的代码在不同仓库，加上 `client_repos`：
-
-```yaml
-    client_repos:
-      客户A: "<客户A的代码地址>"
-      客户B: "<客户B的代码地址>"
 ```
 
 写入后用 `read_file` 读取确认 YAML 格式正确。
