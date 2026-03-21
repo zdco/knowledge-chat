@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - AI_GUIDE_ANALYZER.md 新增"刷新服务描述"流程：用户可触发对已注册服务重新扫描代码并更新描述，解决代码更新后描述过时的问题
 - AI_GUIDE_ANALYZER.md 服务描述生成规则补充：描述中不包含版本号
 - AI_GUIDE_ANALYZER.md 代码扫描新增排除目录规则：跳过 example/test/demo/doc/benchmark 等非业务代码目录，避免误识别
+- AI_GUIDE_ANALYZER.md 重写描述生成维度：从业务视角描述（核心职责、数据流向、外部依赖、关键配置），禁止写入类名/方法名/版本号等代码级细节
 
 ### Added
 - services.yaml 新增 `businesses` 段：按业务线对服务分组（纯标签，不影响逻辑）
