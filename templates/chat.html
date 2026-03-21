@@ -313,7 +313,7 @@ function fileToBase64(file){
 }
 
 // ── 对话历史持久化 ──────────────────────────────
-const STORAGE_KEY='mdschat_sessions_'+location.port+'_'+location.pathname;
+const STORAGE_KEY='mdschat_sessions_'+location.port+'_'+location.pathname+'_'+APP_MODE;
 let currentSessionId=null;
 
 function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}

@@ -41,6 +41,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 移除 `trace_dependency` 工具和 `get_dependency_tree()` 函数（被 `scan_service` 替代）
 
 ### Fixed
+- 日志分析模式和知识问答模式的浏览器对话历史不再混在一起，localStorage key 加入运行模式区分
 - 日志分析模式（log-analyzer）：config.yaml 新增 `mode` 字段切换运行模式，`analyzer` 配置段定义 session/worktree 参数
 - 服务注册表（services.yaml）：定义微服务名称、仓库路径、语言、依赖关系，支持 AI 通过对话自动生成
 - services.yaml `repo` 支持三种格式：本地 git 仓库、远程 git URL（自动 clone）、本地普通目录（自动复制）
