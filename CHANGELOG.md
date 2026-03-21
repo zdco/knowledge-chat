@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - AI_GUIDE_ANALYZER.md 注册时自动从服务 ID 生成 PascalCase/kebab-case/全小写别名，确保用户用任何命名风格都能匹配到服务
 - AI_GUIDE_ANALYZER.md 移除与注册生成无关的内容（repo 地址格式表、客户仓库映射运行时示例、上传压缩包说明），减少对 AI 生成流程的干扰
 - AI_GUIDE_ANALYZER.md 修正步骤顺序（先推断服务 ID 再 clone）、去掉重复的 client_repos 示例、英文服务名称仅作为别名参考而非直接写入 name 字段
+- AI_GUIDE_ANALYZER.md 重写服务描述生成规则：要求从入口文件、配置文件、接口定义等多维度扫描，生成包含核心职责、关键技术、对外接口、数据流向的描述，而非简单复制服务名
 
 ### Added
 - services.yaml 新增 `businesses` 段：按业务线对服务分组（纯标签，不影响逻辑）

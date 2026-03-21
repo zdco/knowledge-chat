@@ -129,15 +129,35 @@ git submodule update --init --depth 1
 
 注意：如果提取到的名称是英文（如 `Market Gateway`），仅作为参考放入 aliases，`name` 字段留空让用户补充中文显示名。
 
-### 第五步：提取服务描述
+### 第五步：生成服务描述
 
-按优先级尝试：
+描述应能让 AI 在排查问题时快速理解服务的职责和技术特征，不是一句话概括，而是包含以下维度：
 
-1. `README.md` 标题后的第一段正文（跳过徽章、空行）
-2. `pom.xml` 的 `<description>` 标签
-3. `package.json` 的 `description` 字段
-4. `Cargo.toml` 的 `[package] description`
-5. 以上都找不到 → 根据目录结构、源文件名、构建配置等特征，生成一句简短描述
+1. **核心职责**：这个服务做什么（从 README、入口文件、main 函数推断）
+2. **关键技术**：用了什么协议/中间件（如 TCP 长连接、gRPC、Redis、Kafka、Oracle）
+3. **对外接口**：提供什么接口或端口（从配置文件、proto 文件、路由定义推断）
+4. **数据流向**：数据从哪来、到哪去（从代码中的上下游调用推断）
+
+**信息来源**（按优先级扫描）：
+
+1. `README.md` 的项目介绍段落
+2. 构建文件中的描述字段（`pom.xml` `<description>`、`package.json` `description` 等）
+3. 入口文件（`main.cpp`、`Application.java`、`main.go`、`app.py` 等）的结构和注释
+4. 配置文件（`application.yml`、`config.ini`、`.env.example` 等）中的端口、连接地址、中间件配置
+5. 接口定义文件（`*.proto`、`*.thrift`、OpenAPI/Swagger）
+6. 目录结构和模块划分
+
+**描述示例**：
+
+```
+接收交易所 TCP 行情数据，解码后通过共享内存和 UDP 组播分发给下游服务；支持多交易所多协议（上交所 FAST、深交所 Binary），内置行情快照缓存，提供 REST 接口供查询最新行情
+```
+
+而不是：
+
+```
+行情网关服务
+```
 
 ### 第六步：清理临时文件
 
@@ -162,7 +182,7 @@ services:
     name: "行情网关"
     repo: "http://gitlab.whup.com/HQSystem/market_gateway/tree/dev"
     language: "C++"
-    description: "接收交易所行情数据并分发"
+    description: "接收交易所 TCP 行情数据，解码后通过共享内存和 UDP 组播分发给下游服务；支持多交易所协议，内置行情快照缓存，提供 REST 接口查询最新行情"
     aliases: ["MarketGateway", "HQGateway"]
     client_repos:
       客户A: "http://old-gitlab.whup.com/legacy/market_gateway/tree/master"
