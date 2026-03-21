@@ -1137,15 +1137,34 @@ def exec_tool(name: str, inp: dict) -> str:
             keyword = inp["keyword"]
             path = _safe_path(inp.get("path", ""), _allowed)
             ctx = str(inp.get("context_lines", 3))
+            # log-analyzer 模式搜索服务代码，需要更多文件类型
+            if APP_MODE == "log-analyzer":
+                include_args = [
+                    "--include=*.h", "--include=*.cpp", "--include=*.c", "--include=*.hpp",
+                    "--include=*.java", "--include=*.py", "--include=*.go", "--include=*.rs",
+                    "--include=*.js", "--include=*.ts", "--include=*.cs",
+                    "--include=*.proto", "--include=*.thrift", "--include=*.jce",
+                    "--include=*.xml", "--include=*.yaml", "--include=*.yml",
+                    "--include=*.json", "--include=*.ini", "--include=*.conf",
+                    "--include=*.properties", "--include=*.toml",
+                    "--include=*.md", "--include=*.txt", "--include=*.sh",
+                    "--include=*.cmake", "--include=CMakeLists.txt",
+                    "--include=*.gradle", "--include=*.sln", "--include=*.csproj",
+                    "--include=Makefile", "--include=*.mk",
+                ]
+            else:
+                include_args = [
+                    "--include=*.jce",
+                    "--include=*.h", "--include=*.cpp", "--include=*.md",
+                    "--include=*.conf", "--include=*.xml", "--include=*.yaml",
+                    "--include=*.yml", "--include=*.txt", "--include=*.sh",
+                ]
             result = subprocess.run(
                 ["grep", "-E", "-r", "-n", f"-C{ctx}",
                  "--exclude-dir=logs", "--exclude-dir=shares",
                  "--exclude-dir=.venv", "--exclude-dir=__pycache__", "--exclude-dir=.git",
                  "--exclude-dir=.text_cache",
-                 "--include=*.jce",
-                 "--include=*.h", "--include=*.cpp", "--include=*.md",
-                 "--include=*.conf", "--include=*.xml", "--include=*.yaml",
-                 "--include=*.yml", "--include=*.txt", "--include=*.sh",
+                 *include_args,
                  keyword, path],
                 capture_output=True, text=True, timeout=30,
             )
@@ -1174,19 +1193,20 @@ def exec_tool(name: str, inp: dict) -> str:
                 else:
                     output += "\n" + "\n".join(cache_matches)
 
-            # 子目录搜索无结果时，自动扩大到整个 knowledge/ 目录重搜
-            knowledge_dir = os.path.join(PROJECT_ROOT, "knowledge")
-            if output == "无匹配结果" and path != PROJECT_ROOT and path != knowledge_dir:
-                fallback = subprocess.run(
-                    ["grep", "-E", "-r", "-n", "-C1",
-                     "--exclude-dir=logs", "--exclude-dir=shares",
-                     "--exclude-dir=.venv", "--exclude-dir=__pycache__", "--exclude-dir=.git",
-                     "--include=*.md", "--include=*.txt", "--include=*.yaml",
-                     keyword, knowledge_dir],
-                    capture_output=True, text=True, timeout=30,
-                )
-                if fallback.stdout:
-                    output = f"在 {os.path.relpath(path, PROJECT_ROOT)} 中未找到，已自动扩大搜索范围：\n{fallback.stdout}"
+            # 子目录搜索无结果时，自动扩大到整个 knowledge/ 目录重搜（仅 knowledge 模式）
+            if APP_MODE == "knowledge":
+                knowledge_dir = os.path.join(PROJECT_ROOT, "knowledge")
+                if output == "无匹配结果" and path != PROJECT_ROOT and path != knowledge_dir:
+                    fallback = subprocess.run(
+                        ["grep", "-E", "-r", "-n", "-C1",
+                         "--exclude-dir=logs", "--exclude-dir=shares",
+                         "--exclude-dir=.venv", "--exclude-dir=__pycache__", "--exclude-dir=.git",
+                         "--include=*.md", "--include=*.txt", "--include=*.yaml",
+                         keyword, knowledge_dir],
+                        capture_output=True, text=True, timeout=30,
+                    )
+                    if fallback.stdout:
+                        output = f"在 {os.path.relpath(path, PROJECT_ROOT)} 中未找到，已自动扩大搜索范围：\n{fallback.stdout}"
 
         elif name == "read_file":
             fpath = _safe_path(inp["path"], _allowed)

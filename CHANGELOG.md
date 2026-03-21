@@ -33,6 +33,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 后端 SSE 流每 15 秒发送心跳保持连接，防止 nginx/代理超时断开
 - 前端 5 分钟无数据自动超时恢复界面并提示，避免永久卡在"思考中"
 - log-analyzer 的 session ID 随对话历史一起持久化，切换历史对话或刷新页面后不会丢失，避免重复拉取代码
+- log-analyzer 模式下 search 搜索无结果时不再 fallback 到 knowledge 目录
+- log-analyzer 模式下 search 支持更多文件类型（.java/.py/.go/.rs/.proto/.thrift/.json/.ini 等）
+- 上传按钮显示时使用 flex 布局，SVG 图标和文字正确对齐
 
 ### Changed
 - services.yaml 去掉 `depends_on` 字段，依赖关系由 AI 通过 `scan_service` 从代码中实时发现
