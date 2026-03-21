@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - AI_GUIDE_ANALYZER.md 修正步骤顺序（先推断服务 ID 再 clone）、去掉重复的 client_repos 示例、英文服务名称仅作为别名参考而非直接写入 name 字段
 - AI_GUIDE_ANALYZER.md 重写服务描述生成规则：要求从入口文件、配置文件、接口定义等多维度扫描，生成包含核心职责、关键技术、对外接口、数据流向的描述，而非简单复制服务名
 - AI_GUIDE_ANALYZER.md 新增"刷新服务描述"流程：用户可触发对已注册服务重新扫描代码并更新描述，解决代码更新后描述过时的问题
+- AI_GUIDE_ANALYZER.md 服务描述生成规则补充：描述中不包含版本号
 
 ### Added
 - services.yaml 新增 `businesses` 段：按业务线对服务分组（纯标签，不影响逻辑）
