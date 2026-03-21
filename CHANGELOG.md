@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 新增 `scan_service` 工具：扫描服务代码中的依赖线索（配置文件、RPC 接口定义、构建文件、代码引用），与已注册服务交叉匹配，替代静态 `depends_on`
 - `list_services` 工具输出按业务线分组显示
 - `load_businesses_config()` 函数：加载 services.yaml 中的业务线分组配置
+- git clone 失败时自动将 HTTP(S) 地址转为 SSH 格式重试，用户无需手动配置 git credential
 
 ### Changed
 - services.yaml 去掉 `depends_on` 字段，依赖关系由 AI 通过 `scan_service` 从代码中实时发现

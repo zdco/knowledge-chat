@@ -326,7 +326,19 @@ class SessionManager:
                 capture_output=True, text=True, timeout=300,
             )
             if result.returncode != 0:
-                raise RuntimeError(f"git clone 失败: {result.stderr.strip()}")
+                # HTTP 认证失败时自动转 SSH 重试
+                ssh_url = self._http_to_ssh(repo)
+                if ssh_url:
+                    logger.info("HTTP clone 失败，尝试 SSH: %s", ssh_url)
+                    # 清理失败的目录
+                    if os.path.exists(local_repo):
+                        shutil.rmtree(local_repo, ignore_errors=True)
+                    result = subprocess.run(
+                        ["git", "clone", "--no-checkout", ssh_url, local_repo],
+                        capture_output=True, text=True, timeout=300,
+                    )
+                if result.returncode != 0:
+                    raise RuntimeError(f"git clone 失败: {result.stderr.strip()}")
             # 初始化 submodule 配置（不 checkout，只注册）
             subprocess.run(
                 ["git", "submodule", "init"],
@@ -338,6 +350,20 @@ class SessionManager:
         if not os.path.isdir(repo):
             raise RuntimeError(f"仓库路径不存在: {repo}")
         return repo
+
+    @staticmethod
+    def _http_to_ssh(url: str) -> str | None:
+        """将 HTTP(S) git URL 转为 SSH 格式。
+
+        http(s)://gitlab.example.com/group/project.git
+        → git@gitlab.example.com:group/project.git
+        """
+        m = re.match(r'https?://([^/]+)/(.+)', url)
+        if not m:
+            return None
+        host = m.group(1)
+        path = m.group(2)
+        return f"git@{host}:{path}"
 
     def _is_git_repo(self, path: str) -> bool:
         """判断路径是否为 git 仓库"""
