@@ -330,7 +330,7 @@ function saveCurrentSession(){
   const sessions=loadSessions();
   const idx=sessions.findIndex(s=>s.id===currentSessionId);
   const title=history.find(m=>m.role==='user')?.content?.slice(0,50)||'新对话';
-  const session={id:currentSessionId,title,time:Date.now(),history,dom:chatBox.innerHTML};
+  const session={id:currentSessionId,title,time:Date.now(),history,dom:chatBox.innerHTML,analyzerSessionId:analyzerSessionId||null};
   if(idx>=0)sessions[idx]=session;else sessions.unshift(session);
   // 最多保留 50 条
   if(sessions.length>50)sessions.length=50;
@@ -377,6 +377,7 @@ function loadSession(id){
   if(!session)return;
   currentSessionId=session.id;
   history=session.history||[];
+  analyzerSessionId=session.analyzerSessionId||null;
   // 恢复 DOM
   const welcome=document.getElementById('welcome');
   if(welcome)welcome.style.display='none';

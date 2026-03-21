@@ -32,6 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 客户端断开连接（点击停止或关闭页面）后，后端自动停止生成，不再继续调用 AI API
 - 后端 SSE 流每 15 秒发送心跳保持连接，防止 nginx/代理超时断开
 - 前端 5 分钟无数据自动超时恢复界面并提示，避免永久卡在"思考中"
+- log-analyzer 的 session ID 随对话历史一起持久化，切换历史对话或刷新页面后不会丢失，避免重复拉取代码
 
 ### Changed
 - services.yaml 去掉 `depends_on` 字段，依赖关系由 AI 通过 `scan_service` 从代码中实时发现
