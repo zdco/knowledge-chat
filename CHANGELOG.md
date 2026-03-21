@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - AI_GUIDE_ANALYZER.md 重写批量注册流程：用户提供仓库地址列表 + 补充信息，AI 自动 clone 代码扫描识别语言/框架/描述，生成完整 services.yaml
 - AI_GUIDE_ANALYZER.md 新增单个仓库扫描识别规则：按构建文件识别语言、按优先级提取服务名称和描述，覆盖 C++/Java/Go/Rust/Python/C#/JS/TS 等常见语言
 - AI_GUIDE_ANALYZER.md 简化单个服务注册流程：去掉手动收集信息步骤，改为 clone 扫描后自动生成配置
+- AI_GUIDE_ANALYZER.md clone 时拉取整个仓库并初始化 submodule，子路径项目同时扫描上级目录的构建文件和公共依赖目录，避免遗漏
+- AI_GUIDE_ANALYZER.md 注册时自动从服务 ID 生成 PascalCase/kebab-case/全小写别名，确保用户用任何命名风格都能匹配到服务
 
 ### Added
 - services.yaml 新增 `businesses` 段：按业务线对服务分组（纯标签，不影响逻辑）

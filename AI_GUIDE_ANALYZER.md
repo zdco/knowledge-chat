@@ -58,23 +58,48 @@
 
 ```bash
 git clone <仓库地址> /tmp/<服务ID> --depth 1 --branch <分支>
+cd /tmp/<服务ID>
+git submodule update --init --depth 1
 ```
 
 - 如果 URL 中包含分支信息（如 `/tree/dev`），用该分支；否则用默认分支
-- 如果 URL 中包含子路径（如 `/tree/dev/DbQueryServer`），clone 后进入该子路径扫描
 - `--depth 1` 只拉最新一次提交，节省时间
+- 始终 clone 整个仓库，即使 URL 包含子路径（如 `/tree/dev/DbQueryServer`）
+- 初始化 submodule，部分项目的依赖库在 submodule 中
 
-### 第二步：推断服务 ID
+**扫描范围**：以子路径为主入口，但同时检查仓库根目录的以下内容：
+- 根目录的构建文件（如顶层 `CMakeLists.txt` 可能定义全局编译选项和依赖）
+- `lib/`、`third_party/`、`deps/`、`external/` 等公共依赖目录
+- `.gitmodules`（了解 submodule 依赖）
+- 根目录的 `README.md`（可能包含整体项目说明）
 
-- 从 URL 的仓库名或子路径取，转为 `snake_case`
-- 示例：
+这样即使服务代码在子目录，也不会漏掉上级目录的依赖信息和构建配置。
+
+### 第二步：推断服务 ID 和自动生成别名
+
+**服务 ID**：从 URL 的仓库名或子路径取，转为 `snake_case`
+
+示例：
   - `http://gitlab.xxx/group/MarketGateway/tree/dev` → `market_gateway`
   - `http://gitlab.xxx/group/mono-repo/tree/dev/DbQueryServer` → `db_query_server`
   - `http://gitlab.xxx/group/data_server/tree/dev` → `data_server`（已是 snake_case，保持不变）
 
+**自动生成别名**：从服务 ID 自动派生常见变体，加入 `aliases`，确保用户用任何命名风格都能匹配到服务：
+
+| 服务 ID | 自动生成的别名 |
+|---------|---------------|
+| `market_data_server` | `MarketDataServer`（PascalCase）、`market-data-server`（kebab-case）、`marketdataserver`（全小写无分隔） |
+
+生成规则：
+1. **PascalCase**：`snake_case` 每段首字母大写拼接 → `MarketDataServer`
+2. **kebab-case**：下划线替换为连字符 → `market-data-server`
+3. **全小写无分隔**：去掉所有分隔符 → `marketdataserver`
+
+用户额外提供的别名（如中文名、缩写）追加到自动生成的别名之后。
+
 ### 第三步：识别编程语言
 
-按构建文件判断，检查仓库根目录（或子路径目录）下是否存在以下文件：
+按构建文件判断，检查子路径目录和仓库根目录下是否存在以下文件：
 
 | 构建文件 | 语言 | 框架线索 |
 |----------|------|----------|
