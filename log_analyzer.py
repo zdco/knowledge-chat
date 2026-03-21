@@ -1,4 +1,5 @@
 """日志分析模块：Session 管理 + git worktree 管理 + 日志预处理"""
+import hashlib
 import json
 import logging
 import os
@@ -228,28 +229,55 @@ class SessionManager:
         if service_id in worktrees:
             existing = worktrees[service_id]
             if existing.get("_cache_key") == cache_key:
-                code_path = existing["path"]
-                if actual_sub_path:
-                    code_path = os.path.join(code_path, actual_sub_path)
-                if os.path.isdir(code_path):
-                    return code_path
+                wt_path = existing["path"]
+                if os.path.isdir(wt_path):
+                    return wt_path
 
-        wt_path = os.path.join(self.worktree_base, session_id, service_id)
+        # 用仓库名+版本哈希作为 worktree 目录名，同一仓库同一版本共享
+        repo_id = actual_repo.rstrip("/").rsplit("/", 1)[-1].replace(".git", "")
+        version_hash = hashlib.md5(cache_key.encode()).hexdigest()[:8]
+        wt_dir_name = f"{repo_id}_{version_hash}"
+        wt_path = os.path.join(self.worktree_base, session_id, wt_dir_name)
 
-        # 清理旧目录
+        # 检查是否已有其他服务创建了同一个 worktree（同仓库同版本共享）
         if os.path.isdir(wt_path):
-            # 尝试 git worktree remove
-            old_info = worktrees.get(service_id, {})
-            old_repo = old_info.get("repo", "")
-            if old_repo and self._is_git_repo(old_repo):
-                try:
-                    subprocess.run(
-                        ["git", "worktree", "remove", "--force", wt_path],
-                        cwd=old_repo, capture_output=True, timeout=30,
-                    )
-                except Exception:
-                    pass
-            shutil.rmtree(wt_path, ignore_errors=True)
+            # 已存在，直接复用，只更新 meta
+            worktrees[service_id] = {
+                "path": wt_path,
+                "sub_path": actual_sub_path,
+                "repo": actual_repo,
+                "version": effective_version,
+                "client": client,
+                "source_type": "shared",
+                "_cache_key": cache_key,
+                "created_at": datetime.now().isoformat(),
+            }
+            meta["worktrees"] = worktrees
+            self.save_meta(session_id, meta)
+            logger.info("复用已有 worktree: %s → %s (主目录: %s)", service_id, wt_path, actual_sub_path or "/")
+            return wt_path
+
+        # 清理该服务之前的 worktree（如果换了仓库或版本）
+        if service_id in worktrees:
+            old_info = worktrees[service_id]
+            old_path = old_info.get("path", "")
+            if old_path and old_path != wt_path and os.path.isdir(old_path):
+                # 检查是否有其他服务还在用这个 worktree
+                other_using = any(
+                    sid != service_id and info.get("path") == old_path
+                    for sid, info in worktrees.items()
+                )
+                if not other_using:
+                    old_repo = old_info.get("repo", "")
+                    if old_repo and self._is_git_repo(old_repo):
+                        try:
+                            subprocess.run(
+                                ["git", "worktree", "remove", "--force", old_path],
+                                cwd=old_repo, capture_output=True, timeout=30,
+                            )
+                        except Exception:
+                            pass
+                    shutil.rmtree(old_path, ignore_errors=True)
 
         os.makedirs(os.path.dirname(wt_path), exist_ok=True)
 
@@ -258,7 +286,7 @@ class SessionManager:
 
         if self._is_git_repo(local_repo):
             # git 仓库：用 worktree
-            ref = resolved_version or "HEAD"
+            ref = effective_version
             try:
                 result = subprocess.run(
                     ["git", "worktree", "add", "--detach", wt_path, ref],
