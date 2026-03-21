@@ -27,6 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `load_businesses_config()` 函数：加载 services.yaml 中的业务线分组配置
 - git clone 失败时自动将 HTTP(S) 地址转为 SSH 格式重试，用户无需手动配置 git credential
 - 页面标题旁显示模式标签（"日志分析"或"知识问答"），区分当前运行模式
+- 欢迎语按模式区分：日志分析模式显示"上传日志文件，我来帮你分析定位问题"
 
 ### Changed
 - services.yaml 去掉 `depends_on` 字段，依赖关系由 AI 通过 `scan_service` 从代码中实时发现

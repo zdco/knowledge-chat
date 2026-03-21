@@ -134,7 +134,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 <div class="chat-container" id="chatBox">
   <div class="examples" id="welcome">
     <h2>有什么可以帮你的？</h2>
-    <p style="color:var(--text-secondary)">我可以搜索代码、文档和配置来回答你的问题</p>
+    <p style="color:var(--text-secondary)">{{ '上传日志文件，我来帮你分析定位问题' if app_mode == 'log-analyzer' else '我可以搜索代码、文档和配置来回答你的问题' }}</p>
     {% for group in example_groups %}
     <div class="example-group">
       <h3>{{ group.name }}</h3>
