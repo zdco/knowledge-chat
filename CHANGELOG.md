@@ -30,6 +30,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 欢迎语按模式区分：日志分析模式显示"上传日志文件，我来帮你分析定位问题"
 - AI 回复过程中发送按钮变为"停止"按钮，点击可中断当前回复
 - 客户端断开连接（点击停止或关闭页面）后，后端自动停止生成，不再继续调用 AI API
+- 后端 SSE 流每 15 秒发送心跳保持连接，防止 nginx/代理超时断开
+- 前端 5 分钟无数据自动超时恢复界面并提示，避免永久卡在"思考中"
 
 ### Changed
 - services.yaml 去掉 `depends_on` 字段，依赖关系由 AI 通过 `scan_service` 从代码中实时发现

@@ -4,6 +4,8 @@ import hashlib
 import json
 import logging
 import os
+import queue
+import threading
 import uuid
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
@@ -123,10 +125,35 @@ def chat_api():
         # 先发送 session_id 给前端
         if session_id:
             yield f"event: session\ndata: {json.dumps({'session_id': session_id}, ensure_ascii=False)}\n\n"
+
+        # 用线程+队列实现心跳：agent 在子线程产出事件，主线程带超时读取，超时则发心跳
+        q = queue.Queue()
+        _SENTINEL = object()
+
+        def _producer():
+            try:
+                for event in run_agent_stream(messages, session_id=session_id):
+                    q.put(event)
+            except Exception as e:
+                q.put({"event": "error", "data": {"message": str(e)}})
+            finally:
+                q.put(_SENTINEL)
+
+        t = threading.Thread(target=_producer, daemon=True)
+        t.start()
+
         try:
-            for event in run_agent_stream(messages, session_id=session_id):
-                evt_type = event["event"]
-                evt_data = json.dumps(event["data"], ensure_ascii=False)
+            while True:
+                try:
+                    item = q.get(timeout=15)
+                except queue.Empty:
+                    # 15 秒没有事件，发心跳保持连接
+                    yield ": keepalive\n\n"
+                    continue
+                if item is _SENTINEL:
+                    break
+                evt_type = item["event"]
+                evt_data = json.dumps(item["data"], ensure_ascii=False)
                 yield f"event: {evt_type}\ndata: {evt_data}\n\n"
         except GeneratorExit:
             logger.info("客户端断开连接，停止生成")

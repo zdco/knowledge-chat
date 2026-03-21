@@ -543,10 +543,22 @@ async function sendMessage(){
     let buffer='';
     let eventType='';
     let streamDone=false;
+    let lastEventTime=Date.now();
+    const STREAM_TIMEOUT=300000; // 5 分钟无数据视为超时
+    const timeoutChecker=setInterval(()=>{
+      if(Date.now()-lastEventTime>STREAM_TIMEOUT){
+        clearInterval(timeoutChecker);
+        reader.cancel();
+        if(thinkingEl.parentNode)thinkingEl.remove();
+        addMsg('ai','<span style="color:var(--text-secondary)">响应超时，请重试</span>');
+        sending=false;activeReader=null;sendBtn.textContent='发送';
+      }
+    },10000);
 
     while(true){
       const{done,value}=await reader.read();
       if(done)break;
+      lastEventTime=Date.now();
       buffer+=decoder.decode(value,{stream:true});
       const lines=buffer.split('\n');
       buffer=lines.pop();
@@ -606,7 +618,9 @@ async function sendMessage(){
       }
       if(streamDone)break;
     }
+    clearInterval(timeoutChecker);
   }catch(e){
+    clearInterval(timeoutChecker);
     if(thinkingEl.parentNode)thinkingEl.remove();
     addMsg('ai','<span style="color:red">请求失败: '+e.message+'</span>');
   }
