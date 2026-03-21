@@ -752,6 +752,13 @@ _ANALYZER_TOOLS = [
 
 if APP_MODE == "log-analyzer":
     TOOLS += _ANALYZER_TOOLS
+    # 移除日志分析模式不需要的工具
+    TOOLS = [t for t in TOOLS if t["name"] != "write_file"]
+    # 调整 search 工具描述，限定搜索范围为已加载的服务代码
+    for t in TOOLS:
+        if t["name"] == "search":
+            t["description"] = "在已加载的服务代码中搜索关键词，返回匹配行及上下文。需要先用 switch_service 加载服务代码。支持正则。"
+            break
     # 扩展必填参数映射
     _REQUIRED_FIELDS_EXTRA = {
         "read_log": ["file"],
