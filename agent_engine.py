@@ -211,7 +211,7 @@ def load_knowledge_domains() -> list[dict]:
     return domains
 
 
-KNOWLEDGE_DOMAINS = load_knowledge_domains()
+KNOWLEDGE_DOMAINS = load_knowledge_domains() if APP_MODE == "knowledge" else []
 
 _domains_lock = threading.Lock()
 request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="-")
@@ -219,6 +219,8 @@ request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id
 
 def reload_domains():
     """重新加载所有知识域并重建 system prompt"""
+    if APP_MODE != "knowledge":
+        return
     global KNOWLEDGE_DOMAINS, SYSTEM_PROMPT
     new_domains = load_knowledge_domains()
     with _domains_lock:

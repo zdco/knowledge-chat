@@ -26,9 +26,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `list_services` 工具输出按业务线分组显示
 - `load_businesses_config()` 函数：加载 services.yaml 中的业务线分组配置
 - git clone 失败时自动将 HTTP(S) 地址转为 SSH 格式重试，用户无需手动配置 git credential
+- 页面标题旁显示模式标签（"日志分析"或"知识问答"），区分当前运行模式
 
 ### Changed
 - services.yaml 去掉 `depends_on` 字段，依赖关系由 AI 通过 `scan_service` 从代码中实时发现
+- log-analyzer 模式下跳过 knowledge 目录的初始化和热加载，避免无意义的目录扫描开销
 - AI_GUIDE_ANALYZER.md 简化注册流程：用户只需提供仓库地址列表和业务线归属，不需要梳理依赖关系
 - system prompt 不再列出静态依赖关系，改为按业务线列出服务清单，引导 AI 用 `scan_service` 发现依赖
 

@@ -14,7 +14,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .header{background:var(--primary);color:#fff;padding:16px 24px;font-size:18px;font-weight:600;flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
 .header .left{display:flex;align-items:center;gap:10px}
 .header span{font-size:24px}
-.header-actions{display:flex;gap:8px}
+.header .mode-tag{font-size:11px;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.2);color:rgba(255,255,255,0.9);font-weight:400;margin-left:8px}
 .header-actions button{background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;transition:all .2s}
 .header-actions button:hover{background:rgba(255,255,255,0.25)}
 .chat-container{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:8px}
@@ -124,7 +124,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 </div>
 
 <div class="header">
-  <div class="left"><span>🤖</span> {{ title }}</div>
+  <div class="left"><span>🤖</span> {{ title }}<span class="mode-tag">{{ '日志分析' if app_mode == 'log-analyzer' else '知识问答' }}</span></div>
   <div class="header-actions">
     <button onclick="shareChat()" id="shareBtn">🔗 分享</button>
     <button onclick="toggleHistory()">📋 历史</button>
