@@ -176,51 +176,7 @@ services:
 
 写入后用 `read_file` 读取确认 YAML 格式正确。
 
-## repo 地址格式
-
-`repo` 和 `client_repos` 中的地址都支持以下格式，系统自动识别处理：
-
-| 格式 | 示例 | 说明 |
-|------|------|------|
-| GitLab/GitHub 页面链接 | `http://gitlab.whup.com/group/project/tree/dev/DbQueryServer` | 自动解析出仓库、分支 `dev`、子路径 `DbQueryServer` |
-| git 仓库地址 | `https://gitlab.example.com/group/project.git` | 首次使用自动 clone，submodule 自动拉取 |
-| SSH 地址 | `git@gitlab.example.com:group/project.git` | 需要服务器有 SSH key 访问权限 |
-| 本地 git 仓库 | `/data/repos/market_gateway` | 通过 git worktree 切版本，不影响原仓库 |
-| 本地普通目录 | `/data/customer/legacy_code` | 非 git 项目，复制到隔离目录 |
-
-**用户提供什么地址就写什么地址，不需要手动转换。**
-
-## 客户仓库映射（client_repos）
-
-同一个服务，不同客户的代码可能在不同仓库（常见于 git 仓库迁移过的场景）：
-
-```yaml
-trade_engine:
-  name: "交易引擎"
-  repo: "https://new-gitlab.example.com/trading/engine.git"
-  language: "C++"
-  description: "核心交易撮合引擎"
-  client_repos:
-    # 直接写地址（支持 GitLab 页面链接）
-    客户A: "http://old-gitlab.example.com/legacy/trade-engine/tree/master"
-    客户B: "git@internal-git:trading/engine-v2.git"
-
-    # 如果该客户的目录结构不同，用完整格式
-    客户C:
-      repo: "/data/customer_code/clientC/trade_engine"
-      sub_path: "src"
-```
-
-用户在对话中说"客户A的交易引擎 v2.3.1 有问题"，AI 调用：
-```
-switch_service(service="trade_engine", version="v2.3.1", client="客户A")
-```
-
-版本号不需要在配置中写死，用户对话时提供即可。没指定版本时加载默认分支的最新代码。
-
-## 用户上传代码压缩包
-
-如果用户在对话中上传了代码压缩包（zip/tar.gz），不需要在 services.yaml 中注册。代码会自动解压到隔离目录，直接用 search/read_file 分析即可。
+**用户提供什么地址就写什么地址，不需要手动转换。** 系统会自动识别 GitLab/GitHub 页面链接、git 仓库地址、SSH 地址、本地路径等格式。
 
 ## 注意事项
 
