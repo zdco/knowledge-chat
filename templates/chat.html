@@ -99,8 +99,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .share-modal .close-btn button:hover{background:var(--bg)}
 
 /* 文件上传相关样式 */
-.upload-btn{background:none;border:1px solid var(--border);border-radius:var(--radius);padding:0 12px;cursor:pointer;font-size:18px;color:var(--text-secondary);display:none}
-.upload-btn:hover{border-color:var(--primary);color:var(--primary)}
+.upload-btn{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;color:var(--text-secondary);display:none;white-space:nowrap}
+.upload-btn:hover{border-color:var(--primary);color:var(--primary);background:#e3f2fd}
 .drop-overlay{position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(25,118,210,0.12);z-index:300;display:none;align-items:center;justify-content:center;pointer-events:none}
 .drop-overlay.active{display:flex}
 .drop-overlay .drop-hint{background:#fff;border:2px dashed var(--primary);border-radius:16px;padding:40px 60px;font-size:16px;color:var(--primary);font-weight:600}
@@ -150,7 +150,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 <div class="drop-overlay" id="dropOverlay"><div class="drop-hint">📎 拖放文件到此处上传</div></div>
 <div class="upload-preview" id="uploadPreview"></div>
 <div class="input-area">
-  <button class="upload-btn" id="uploadBtn" onclick="document.getElementById('fileInput').click()" title="上传文件">📎</button>
+  <button class="upload-btn" id="uploadBtn" onclick="document.getElementById('fileInput').click()" title="上传文件">📎 上传文件</button>
   <input type="file" id="fileInput" multiple accept=".log,.txt,.zip,.tar,.gz,.tgz,.png,.jpg,.jpeg" style="display:none" onchange="handleFileSelect(this.files)">
   <textarea id="userInput" placeholder="输入你的问题..." rows="1" onkeydown="handleKey(event)"></textarea>
   <button id="sendBtn" onclick="sendMessage()">发送</button>
