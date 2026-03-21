@@ -301,6 +301,9 @@ class SessionManager:
 
     def _ensure_local_repo(self, repo: str) -> str:
         """确保 repo 在本地可用。远程 URL 自动 clone 到 repos_dir，本地路径直接返回。"""
+        # 禁止 git 弹出交互式认证提示，遇到需要认证时直接报错
+        git_env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+
         # 判断是否为远程 URL
         if repo.startswith(("http://", "https://", "git@", "ssh://")):
             # 从 URL 提取仓库名
@@ -315,6 +318,7 @@ class SessionManager:
                 subprocess.run(
                     ["git", "fetch", "--all", "--tags"],
                     cwd=local_repo, capture_output=True, timeout=120,
+                    env=git_env,
                 )
                 return local_repo
 
@@ -324,6 +328,7 @@ class SessionManager:
             result = subprocess.run(
                 ["git", "clone", "--no-checkout", repo, local_repo],
                 capture_output=True, text=True, timeout=300,
+                env=git_env,
             )
             if result.returncode != 0:
                 # HTTP 认证失败时自动转 SSH 重试
