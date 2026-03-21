@@ -368,6 +368,7 @@ function renderHistoryList(){
   }).join('');
 }
 function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function escHtmlBr(s){return escHtml(s).replace(/\n/g,'<br>')}
 function loadSession(id){
   if(sending)return;
   const sessions=loadSessions();
@@ -496,12 +497,12 @@ async function sendMessage(){
   let images=[];
   let uploadContext='';
   if(hasFiles&&APP_MODE==='log-analyzer'){
-    addMsg('user',escHtml(text||'')+(pendingFiles.length?' <span style="color:var(--text-secondary)">(附件 '+pendingFiles.length+' 个文件)</span>':''));
+    addMsg('user',escHtmlBr(text||'')+(pendingFiles.length?' <span style="color:var(--text-secondary)">(附件 '+pendingFiles.length+' 个文件)</span>':''));
     const uploadResult=await uploadFiles();
     images=uploadResult.images;
     uploadContext=uploadResult.uploadContext;
   }else{
-    addMsg('user',escHtml(text));
+    addMsg('user',escHtmlBr(text));
   }
 
   // 构建发送消息
