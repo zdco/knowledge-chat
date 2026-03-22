@@ -13,7 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 文件上传前端预检：选择文件时立即检查大小，超限文件直接提示不发请求
 
 ### Changed
-- 文件上传大小限制从 100MB 调整为 500MB，适配大日志压缩包场景
+- 文件上传大小限制从 100MB 调整为 1GB，适配大日志压缩包场景
 
 ### Fixed
 - 修复首次上传文件时因 session_id 为空导致 400 错误的问题，upload 接口在无 session_id 时自动创建

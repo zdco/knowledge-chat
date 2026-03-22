@@ -62,4 +62,4 @@ analyzer:
   session_dir: "/data/sessions"          # session 数据目录
   worktree_base: "/data/worktrees"       # git worktree 根目录
   session_ttl: 604800                     # session 过期时间（秒），默认 7 天
-  max_upload_size: 524288000             # 最大上传文件大小（500MB）
+  max_upload_size: 1073741824             # 最大上传文件大小（1GB）

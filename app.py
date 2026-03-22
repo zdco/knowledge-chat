@@ -74,7 +74,7 @@ def _get_examples() -> list[dict]:
 def chat_page():
     return render_template("chat.html", example_groups=_get_examples(), title=SITE_TITLE,
                            app_mode=APP_MODE,
-                           max_upload_size=CONFIG.get("analyzer", {}).get("max_upload_size", 524288000))
+                           max_upload_size=CONFIG.get("analyzer", {}).get("max_upload_size", 1073741824))
 
 
 @app.route("/kchat/api/chat", methods=["POST"])
