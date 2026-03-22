@@ -3,20 +3,20 @@
 # ── 运行模式 ──────────────────────────────────
 # knowledge: 知识域问答模式（默认）
 # log-analyzer: 日志分析模式（需配合 services.yaml）
-mode: knowledge
+mode: log-analyzer
 
 # API 配置（环境变量优先于此处配置：AI_CHAT_BASE_URL / AI_CHAT_API_KEY / AI_CHAT_MODEL）
 api:
   # 代理地址（含 /v1 自动走 OpenAI 格式，否则走 Anthropic 格式）
-  base_url: "http://coding.whup.com/v1"
+  base_url: "http://coding.whup.com/"
   # API 密钥
-  api_key: ""
+  api_key: "sk-jBaRHCXcw8uAePlmcy4iBhlMRic5tS4IM7x2l84RJxfw8xpy"
   # 模型名称
-  model: "MiniMax-M2.5"
+  model: "claude-sonnet-4-6"
   # 单次回复最大 token 数
   max_tokens: 4096
   # Agent 最大工具调用轮数（防止死循环）
-  max_iterations: 50
+  max_iterations: 100
   # API 格式："anthropic" 或 "openai"，不设置则根据 base_url 是否含 /v1 自动判断
   # 非 Claude 模型（GLM、MiniMax 等）建议用 openai 格式以获得更好的工具调用兼容性
   # api_format: "openai"
@@ -45,6 +45,9 @@ tools:
   # 设为 "auto" 可在首次启动时自动下载安装到项目目录下
   # 也可填写已有的绝对路径，如 "/data/user/chaolv/oracle/instantclient_19_24"
   oracle_client_path: "auto"
+  # 多轮工具调用上下文截断：保留最近 N 轮完整工具结果，更早轮次截断到 max_length 字符
+  compact_keep_recent: 3
+  compact_max_length: 500
 
 # 日志配置
 logging:

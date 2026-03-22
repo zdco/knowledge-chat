@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- 多轮工具调用上下文截断：保留最近 N 轮完整工具结果，更早轮次自动截断到指定字符数，大幅降低 token 消耗（config.yaml `compact_keep_recent` / `compact_max_length` 可配置）
+
 ### Changed
 - AI_GUIDE_ANALYZER.md 重写批量注册流程：用户提供仓库地址列表 + 补充信息，AI 自动 clone 代码扫描识别语言/框架/描述，生成完整 services.yaml
 - AI_GUIDE_ANALYZER.md 新增单个仓库扫描识别规则：按构建文件识别语言、按优先级提取服务名称和描述，覆盖 C++/Java/Go/Rust/Python/C#/JS/TS 等常见语言

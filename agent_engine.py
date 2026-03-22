@@ -38,6 +38,9 @@ MAX_TOKENS = CONFIG["api"]["max_tokens"]
 MAX_ITERATIONS = CONFIG["api"]["max_iterations"]
 MAX_OUTPUT_LEN = CONFIG["tools"]["max_output_length"]
 MAX_DISPLAY_LEN = CONFIG["tools"]["max_display_length"]
+_COMPACT_KEEP_RECENT = CONFIG["tools"].get("compact_keep_recent", 3)
+_COMPACT_MAX_LEN = CONFIG["tools"].get("compact_max_length", 500)
+_COMPACT_SKIP_TOOLS = {"switch_service", "list_services", "scan_service"}
 
 # API 格式：显式配置 > 根据实际生效的 BASE_URL 自动判断（含 /v1 用 openai，否则 anthropic）
 _api_format_cfg = CONFIG["api"].get("api_format", "").lower()
@@ -1485,6 +1488,120 @@ def _tools_to_openai() -> list[dict]:
     } for tool in TOOLS]
 
 
+def _truncate_tool_content(content: str) -> tuple[str, int]:
+    """截断单个工具结果，返回 (截断后内容, 节省字符数)"""
+    orig_len = len(content)
+    if orig_len <= _COMPACT_MAX_LEN:
+        return content, 0
+    truncated = content[:_COMPACT_MAX_LEN] + f"\n...(已截断，原始 {orig_len} 字符，如需重新查看请再次调用工具)"
+    return truncated, orig_len - len(truncated)
+
+
+def _truncate_tool_results_anthropic(messages: list, iteration: int):
+    """截断 Anthropic 格式消息中旧轮次的工具结果（原地修改）"""
+    # 从后往前找包含 tool_result 的 user 消息，标记轮次
+    tool_round_indices = []  # [(user_msg_index, prev_assistant_index), ...]
+    for i in range(len(messages) - 1, -1, -1):
+        msg = messages[i]
+        if msg["role"] != "user" or not isinstance(msg.get("content"), list):
+            continue
+        has_tool_result = any(
+            isinstance(b, dict) and b.get("type") == "tool_result"
+            for b in msg["content"]
+        )
+        if not has_tool_result:
+            continue
+        # 找前一个 assistant 消息
+        prev_asst = None
+        for j in range(i - 1, -1, -1):
+            if messages[j]["role"] == "assistant":
+                prev_asst = j
+                break
+        tool_round_indices.append((i, prev_asst))
+
+    if len(tool_round_indices) <= _COMPACT_KEEP_RECENT:
+        return
+
+    # 需要截断的轮次（跳过最近 keep_recent 轮）
+    rounds_to_truncate = tool_round_indices[_COMPACT_KEEP_RECENT:]
+    truncated_count = 0
+    saved_chars = 0
+
+    for user_idx, asst_idx in rounds_to_truncate:
+        # 从 assistant 消息建立 tool_use_id → name 映射
+        id_to_name = {}
+        if asst_idx is not None:
+            asst_content = messages[asst_idx].get("content", [])
+            if isinstance(asst_content, list):
+                for b in asst_content:
+                    if hasattr(b, "type") and b.type == "tool_use":
+                        id_to_name[b.id] = b.name
+                    elif isinstance(b, dict) and b.get("type") == "tool_use":
+                        id_to_name[b.get("id")] = b.get("name")
+
+        # 截断 tool_result
+        for block in messages[user_idx]["content"]:
+            if not isinstance(block, dict) or block.get("type") != "tool_result":
+                continue
+            tool_name = id_to_name.get(block.get("tool_use_id"), "")
+            if tool_name in _COMPACT_SKIP_TOOLS:
+                continue
+            content = block.get("content", "")
+            if isinstance(content, str) and len(content) > _COMPACT_MAX_LEN:
+                block["content"], saved = _truncate_tool_content(content)
+                saved_chars += saved
+                truncated_count += 1
+
+    if truncated_count > 0:
+        logger.info("上下文截断: 第 %d 轮，截断 %d 个工具结果，节省约 %d 字符",
+                     iteration, truncated_count, saved_chars)
+
+
+def _truncate_tool_results_openai(oai_messages: list, iteration: int):
+    """截断 OpenAI 格式消息中旧轮次的工具结果（原地修改）"""
+    # 从后往前找 assistant+tool_calls 消息，标记轮次
+    tool_round_indices = []  # [assistant_msg_index, ...]
+    for i in range(len(oai_messages) - 1, -1, -1):
+        msg = oai_messages[i]
+        if msg.get("role") == "assistant" and msg.get("tool_calls"):
+            tool_round_indices.append(i)
+
+    if len(tool_round_indices) <= _COMPACT_KEEP_RECENT:
+        return
+
+    # 需要截断的轮次（跳过最近 keep_recent 轮）
+    rounds_to_truncate = tool_round_indices[_COMPACT_KEEP_RECENT:]
+
+    # 建立所有需截断轮次的 tool_call_id → name 映射
+    ids_to_truncate = {}  # tool_call_id → tool_name
+    for asst_idx in rounds_to_truncate:
+        for tc in oai_messages[asst_idx].get("tool_calls", []):
+            fn = tc.get("function", {})
+            ids_to_truncate[tc["id"]] = fn.get("name", "")
+
+    # 遍历所有 tool 消息，截断匹配的
+    truncated_count = 0
+    saved_chars = 0
+    for msg in oai_messages:
+        if msg.get("role") != "tool":
+            continue
+        tc_id = msg.get("tool_call_id")
+        if tc_id not in ids_to_truncate:
+            continue
+        tool_name = ids_to_truncate[tc_id]
+        if tool_name in _COMPACT_SKIP_TOOLS:
+            continue
+        content = msg.get("content", "")
+        if isinstance(content, str) and len(content) > _COMPACT_MAX_LEN:
+            msg["content"], saved = _truncate_tool_content(content)
+            saved_chars += saved
+            truncated_count += 1
+
+    if truncated_count > 0:
+        logger.info("上下文截断: 第 %d 轮，截断 %d 个工具结果，节省约 %d 字符",
+                     iteration, truncated_count, saved_chars)
+
+
 def _run_anthropic_stream(messages: list, session_id: str = None):
     """Anthropic SDK 流式调用"""
     import anthropic
@@ -1493,6 +1610,7 @@ def _run_anthropic_stream(messages: list, session_id: str = None):
     sys_prompt = build_system_prompt(session_id) if APP_MODE == "log-analyzer" else SYSTEM_PROMPT
 
     for iteration in range(MAX_ITERATIONS):
+        _truncate_tool_results_anthropic(messages, iteration + 1)
         logger.info("调用 API (anthropic), 第 %d 轮", iteration + 1)
         try:
             with client.messages.stream(
@@ -1577,6 +1695,7 @@ def _run_openai_stream(messages: list, session_id: str = None):
         oai_messages.append({"role": msg["role"], "content": msg["content"]})
 
     for iteration in range(MAX_ITERATIONS):
+        _truncate_tool_results_openai(oai_messages, iteration + 1)
         logger.info("调用 API (openai), 第 %d 轮", iteration + 1)
         try:
             stream = client.chat.completions.create(
