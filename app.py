@@ -172,11 +172,14 @@ if APP_MODE == "log-analyzer":
     @app.route("/kchat/api/upload", methods=["POST"])
     def upload_api():
         """上传文件（日志、压缩包、截图）"""
-        session_id = request.form.get("session_id")
-        if not session_id or not _session_manager:
-            return jsonify({"error": "缺少 session_id"}), 400
+        if not _session_manager:
+            return jsonify({"error": "当前模式不支持上传"}), 400
 
-        _session_manager.create_session(session_id)
+        session_id = request.form.get("session_id")
+        if not session_id:
+            session_id = _session_manager.create_session()
+        else:
+            _session_manager.create_session(session_id)
         uploads_dir = _session_manager.get_uploads_path(session_id)
 
         files = request.files.getlist("files")
