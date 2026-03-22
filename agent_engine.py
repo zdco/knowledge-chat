@@ -778,21 +778,35 @@ def _safe_path(rel: str, allowed_paths: list[str] = None) -> str:
     Args:
         rel: 相对或绝对路径
         allowed_paths: 允许访问的目录列表（log-analyzer 模式），为 None 时限制在 PROJECT_ROOT
+
+    Raises:
+        ValueError: 路径不在允许范围内
     """
     if allowed_paths:
         # log-analyzer 模式：限制在 session 的 worktree + uploads 内
         if not rel or rel in (".", "/", ""):
-            # 空路径：优先返回第一个 worktree 路径（跳过 uploads）
+            # 空路径：优先返回 worktree 路径（最后一个），没有则 uploads（第一个）
             return allowed_paths[-1] if len(allowed_paths) > 1 else allowed_paths[0]
-        abs_path = os.path.normpath(rel) if os.path.isabs(rel) else os.path.normpath(os.path.join(allowed_paths[-1], rel))
+        if os.path.isabs(rel):
+            abs_path = os.path.normpath(rel)
+        else:
+            # 依次尝试每个 allowed_path，取第一个实际存在的
+            abs_path = None
+            for base in allowed_paths:
+                candidate = os.path.normpath(os.path.join(base, rel))
+                if any(candidate.startswith(p) for p in allowed_paths) and os.path.exists(candidate):
+                    abs_path = candidate
+                    break
+            if abs_path is None:
+                # 都不存在，默认拼到 uploads（allowed_paths[0]）
+                abs_path = os.path.normpath(os.path.join(allowed_paths[0], rel))
         if any(abs_path.startswith(p) for p in allowed_paths):
             return abs_path
-        # 不在允许范围内，返回最后一个 worktree 路径
-        return allowed_paths[-1] if len(allowed_paths) > 1 else allowed_paths[0]
+        raise ValueError(f"路径不在允许范围内: {rel}")
 
     abs_path = os.path.normpath(os.path.join(PROJECT_ROOT, rel))
     if not abs_path.startswith(PROJECT_ROOT):
-        return PROJECT_ROOT
+        raise ValueError(f"路径不在允许范围内: {rel}")
     return abs_path
 
 
@@ -1235,7 +1249,7 @@ def exec_tool(name: str, inp: dict) -> str:
                 output = "".join(f"{start + i}: {l}" for i, l in enumerate(selected))
 
         elif name == "write_file":
-            fpath = _safe_path(inp["path"])
+            fpath = _safe_path(inp["path"], _allowed)
             os.makedirs(os.path.dirname(fpath), exist_ok=True)
             with open(fpath, "w", encoding="utf-8") as f:
                 f.write(inp["content"])
@@ -1250,7 +1264,8 @@ def exec_tool(name: str, inp: dict) -> str:
             base = _safe_path(inp.get("path", ""), _allowed)
             pattern = inp["pattern"]
             matches = sorted(glob_mod.glob(os.path.join(base, pattern), recursive=True))
-            rel = [os.path.relpath(m, PROJECT_ROOT) for m in matches]
+            rel_base = base if _allowed else PROJECT_ROOT
+            rel = [os.path.relpath(m, rel_base) for m in matches]
             output = "\n".join(rel) if rel else "无匹配文件"
 
         elif name == "bash":
@@ -1316,13 +1331,7 @@ def exec_tool(name: str, inp: dict) -> str:
 
         # ── 日志分析模式专用工具 ──────────────────
         elif name == "read_log" and APP_MODE == "log-analyzer":
-            session_id = inp.get("_session_id", "")
-            file_rel = inp["file"]
-            if session_id and _session_manager:
-                uploads_dir = _session_manager.get_uploads_path(session_id)
-                filepath = os.path.join(uploads_dir, file_rel)
-            else:
-                filepath = file_rel
+            filepath = _safe_path(inp["file"], _allowed)
             output = read_log_filtered(
                 filepath,
                 level=inp.get("level"),
