@@ -112,6 +112,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .upload-item .remove{cursor:pointer;color:#e53935;font-weight:bold;margin-left:4px}
 .upload-item .remove:hover{color:#b71c1c}
 .msg-ai .inline-image{max-width:300px;max-height:200px;border-radius:8px;margin:4px 0}
+
+/* 上传进度条 */
+.upload-progress{width:100%;padding:8px 24px}
+.upload-progress-info{display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-bottom:4px}
+.upload-progress-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.upload-progress-fill{height:100%;background:var(--primary);border-radius:2px;transition:width 0.2s}
+
+/* 上传状态消息（聊天区内） */
+.upload-status{margin:4px 24px;padding:6px 12px;border-radius:6px;font-size:13px}
+.upload-status-success{background:#e8f5e9;color:#2e7d32}
+.upload-status-error{background:#ffebee;color:#c62828}
 </style>
 </head>
 <body>
@@ -255,6 +266,48 @@ function renderUploadPreview(){
   });
 }
 
+function addUploadStatus(type,text){
+  const div=document.createElement('div');
+  div.className='upload-status upload-status-'+type;
+  div.textContent=text;
+  chatBox.appendChild(div);
+  scrollBottom();
+}
+
+function uploadWithProgress(formData){
+  return new Promise((resolve,reject)=>{
+    const progressEl=document.createElement('div');
+    progressEl.className='upload-progress';
+    progressEl.innerHTML='<div class="upload-progress-info"><span>上传中...</span><span class="upload-pct">0%</span></div><div class="upload-progress-bar"><div class="upload-progress-fill" style="width:0%"></div></div>';
+    const preview=document.getElementById('uploadPreview');
+    preview.parentNode.insertBefore(progressEl,preview);
+
+    const pctEl=progressEl.querySelector('.upload-pct');
+    const fillEl=progressEl.querySelector('.upload-progress-fill');
+
+    const xhr=new XMLHttpRequest();
+    xhr.open('POST',BASE_PATH+'/api/upload');
+    xhr.upload.onprogress=function(e){
+      if(e.lengthComputable){
+        const pct=Math.round(e.loaded/e.total*100);
+        pctEl.textContent=pct+'%';
+        fillEl.style.width=pct+'%';
+      }
+    };
+    xhr.onload=function(){
+      progressEl.remove();
+      if(xhr.status>=200&&xhr.status<300){
+        try{resolve(JSON.parse(xhr.responseText))}catch(e){reject(new Error('响应解析失败'))}
+      }else{
+        reject(new Error('服务器返回 '+xhr.status));
+      }
+    };
+    xhr.onerror=function(){progressEl.remove();reject(new Error('网络错误'))};
+    xhr.ontimeout=function(){progressEl.remove();reject(new Error('上传超时'))};
+    xhr.send(formData);
+  });
+}
+
 async function uploadFiles(){
   // 分离图片和日志文件
   const imageFiles=pendingFiles.filter(f=>f.type==='image');
@@ -274,13 +327,13 @@ async function uploadFiles(){
     formData.append('session_id',analyzerSessionId||'');
     logFiles.forEach(f=>formData.append('files',f.file));
     try{
-      const resp=await fetch(BASE_PATH+'/api/upload',{method:'POST',body:formData});
-      const data=await resp.json();
+      const data=await uploadWithProgress(formData);
       if(data.session_id)analyzerSessionId=data.session_id;
       // 构建上传摘要作为上下文
-      const parts=[];
+      const okFiles=[],failFiles=[],parts=[];
       for(const u of (data.uploads||[])){
-        if(u.error){parts.push(`文件 ${u.name} 上传失败: ${u.error}`);continue}
+        if(u.error){failFiles.push(u);parts.push(`文件 ${u.name} 上传失败: ${u.error}`);continue}
+        okFiles.push(u);
         if(u.type==='log'){
           parts.push(`已上传日志文件 ${u.name}：`);
           for(const fi of (u.files||[])){
@@ -289,8 +342,16 @@ async function uploadFiles(){
           }
         }
       }
+      // 聊天区持久消息
+      if(okFiles.length>0){
+        addUploadStatus('success','✓ 已上传 '+okFiles.length+' 个文件：'+okFiles.map(f=>f.name).join(', '));
+      }
+      for(const f of failFiles){
+        addUploadStatus('error','✗ '+f.name+'：'+f.error);
+      }
       uploadContext=parts.join('\n');
     }catch(e){
+      addUploadStatus('error','✗ 文件上传失败：'+e.message);
       uploadContext='文件上传失败: '+e.message;
     }
   }

@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - 多轮工具调用上下文截断：保留最近 N 轮完整工具结果，更早轮次自动截断到指定字符数，大幅降低 token 消耗（config.yaml `compact_keep_recent` / `compact_max_length` 可配置）
+- 文件上传进度条：大文件上传时显示实时进度百分比，上传完成或失败后自动消失
+- 文件上传结果提示：上传完成后在聊天区插入持久状态消息，成功绿色、失败红色，切换页面后仍可见
 
 ### Fixed
 - 修复首次上传文件时因 session_id 为空导致 400 错误的问题，upload 接口在无 session_id 时自动创建
