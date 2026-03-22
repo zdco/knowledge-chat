@@ -8,11 +8,11 @@ mode: log-analyzer
 # API 配置（环境变量优先于此处配置：AI_CHAT_BASE_URL / AI_CHAT_API_KEY / AI_CHAT_MODEL）
 api:
   # 代理地址（含 /v1 自动走 OpenAI 格式，否则走 Anthropic 格式）
-  base_url: "http://coding.whup.com/"
+  base_url: "http://coding.whup.com/v1"
   # API 密钥
   api_key: "sk-jBaRHCXcw8uAePlmcy4iBhlMRic5tS4IM7x2l84RJxfw8xpy"
   # 模型名称
-  model: "claude-sonnet-4-6"
+  model: "MiniMax-M2.7"
   # 单次回复最大 token 数
   max_tokens: 4096
   # Agent 最大工具调用轮数（防止死循环）
@@ -62,4 +62,4 @@ analyzer:
   session_dir: "/data/sessions"          # session 数据目录
   worktree_base: "/data/worktrees"       # git worktree 根目录
   session_ttl: 604800                     # session 过期时间（秒），默认 7 天
-  max_upload_size: 104857600             # 最大上传文件大小（100MB）
+  max_upload_size: 524288000             # 最大上传文件大小（500MB）

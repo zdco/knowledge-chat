@@ -179,6 +179,7 @@ let activeReader=null;
 
 // 运行模式
 const APP_MODE='{{ app_mode }}';
+const MAX_UPLOAD_SIZE={{ max_upload_size }};
 
 // 从当前页面路径提取路由前缀，适配 nginx 反代不同路径
 const BASE_PATH=location.pathname.replace(/\/chat$/,'');
@@ -237,6 +238,12 @@ function handleFileSelect(files){
 }
 
 function addPendingFile(file){
+  if(file.size>MAX_UPLOAD_SIZE){
+    const sizeMB=Math.round(file.size/1048576);
+    const limitMB=Math.round(MAX_UPLOAD_SIZE/1048576);
+    addUploadStatus('error','✗ '+file.name+'：文件过大（'+sizeMB+'MB），最大 '+limitMB+'MB');
+    return;
+  }
   const isImg=/\.(png|jpg|jpeg)$/i.test(file.name);
   const entry={file:file,type:isImg?'image':'log',id:Date.now()+'_'+Math.random().toString(36).slice(2,5)};
   if(isImg){
