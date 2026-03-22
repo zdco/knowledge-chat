@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - 修复首次上传文件时因 session_id 为空导致 400 错误的问题，upload 接口在无 session_id 时自动创建
+- 修复 log-analyzer 模式下 bash 工具 cwd 指向项目根目录导致无法访问上传文件的问题
 
 ### Changed
 - AI_GUIDE_ANALYZER.md 重写批量注册流程：用户提供仓库地址列表 + 补充信息，AI 自动 clone 代码扫描识别语言/框架/描述，生成完整 services.yaml

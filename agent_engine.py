@@ -1264,9 +1264,10 @@ def exec_tool(name: str, inp: dict) -> str:
                 venv_bin = os.path.join(PROJECT_ROOT, ".venv", "bin")
                 if os.path.isdir(venv_bin):
                     bash_env["PATH"] = venv_bin + ":" + bash_env.get("PATH", "")
+                bash_cwd = _allowed[0] if _allowed else PROJECT_ROOT
                 result = subprocess.run(
                     cmd, shell=True, capture_output=True, text=True,
-                    timeout=30, cwd=PROJECT_ROOT, env=bash_env,
+                    timeout=30, cwd=bash_cwd, env=bash_env,
                 )
                 output = (result.stdout + result.stderr).strip() or "(无输出)"
 
