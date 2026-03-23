@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- 新增"微服务仓库信息"知识域，将 services.yaml 中 128 个微服务的仓库地址、语言、业务归属等信息纳入知识问答
+
 ## [0.3.0] - 2026-03-22
 
 ### Added
